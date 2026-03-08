@@ -5,25 +5,19 @@ import {
   UserCheck, Clock, CheckCircle, XCircle, DollarSign,
   FileText, Award, AlertCircle, Video, Pill, Banknote,
   Smartphone, Building2, Receipt, RefreshCw, X, Send,
-  Loader2, WifiOff, Phone, Mail
+  Loader2, WifiOff, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useNotification } from '../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import { adminService, DashboardStats } from '../services/adminService';
-import { calendarService } from '../services/calendarService';
-import UserManagement from '../components/Admin/UserManagement';
+import { adminService, DashboardStats } from '../../services/adminService';
+import { calendarService } from '../../services/calendarService';
+import UserManagement from '../../components/Admin/UserManagement';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CalendarItem {
   id: string; date: string; slots: string[]; confirmed: boolean;
   doctor?: { firstName: string; lastName: string; id: string };
-}
-interface AdminAppointment {
-  id: string; appointmentDate: string; status: string; type: string;
-  reason?: string; duration?: number; notes?: string;
-  doctor?:  { id: string; firstName: string; lastName: string; specialty?: string };
-  patient?: { id: string; firstName: string; lastName: string; email?: string; phoneNumber?: string };
 }
 interface AdminPrescription {
   id: string; createdAt: string; status: string; isRead: boolean;
@@ -33,9 +27,8 @@ interface AdminPrescription {
   patient?: { id: string; firstName: string; lastName: string; email?: string; phoneNumber?: string };
 }
 interface AdminVideoCall {
-  id: string; createdAt: string; status: string;
-  roomLink?: string; meetingUrl?: string;
-  durationMinutes?: number; duration?: number;
+  id: string; createdAt: string; status: string; roomLink?: string; meetingUrl?: string;
+  durationMinutes?: number; duration?: number; notes?: string;
   doctor?:  { id: string; firstName: string; lastName: string; specialty?: string };
   patient?: { id: string; firstName: string; lastName: string; phoneNumber?: string };
 }
@@ -56,21 +49,24 @@ type Tab = 'dashboard' | 'doctors' | 'patients' | 'appointments'
          | 'prescriptions' | 'videocalls' | 'payments' | 'financial' | 'calendars';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const PAYMENT_METHODS = [
-  { value: 'bank_transfer', label: 'Virement bancaire', icon: Building2,  color: 'text-blue-600'   },
-  { value: 'mobile_money',  label: 'Mobile Money',      icon: Smartphone, color: 'text-green-600'  },
-  { value: 'cash',          label: 'Espèces',           icon: Banknote,   color: 'text-yellow-600' },
-  { value: 'check',         label: 'Chèque',            icon: Receipt,    color: 'text-purple-600' },
+// ─── Opérateurs Mobile Money (Togo + Afrique de l'Ouest) ─────────────────────
+const MOBILE_OPERATORS = [
+  { id: 'tmoney',   label: 'T-Money',         country: 'Togo',       color: 'bg-red-500',     text: 'text-white',       border: 'border-red-500',    ring: 'ring-red-400',    emoji: '🔴' },
+  { id: 'flooz',    label: 'Flooz (Moov)',     country: 'Togo',       color: 'bg-blue-600',    text: 'text-white',       border: 'border-blue-600',   ring: 'ring-blue-400',   emoji: '🔵' },
+  { id: 'mtn',      label: 'MTN MoMo',         country: 'Multi',      color: 'bg-yellow-400',  text: 'text-black',       border: 'border-yellow-400', ring: 'ring-yellow-300', emoji: '🟡' },
+  { id: 'orange',   label: 'Orange Money',     country: 'Multi',      color: 'bg-orange-500',  text: 'text-white',       border: 'border-orange-500', ring: 'ring-orange-400', emoji: '🟠' },
+  { id: 'wave',     label: 'Wave',             country: 'Multi',      color: 'bg-cyan-500',    text: 'text-white',       border: 'border-cyan-500',   ring: 'ring-cyan-400',   emoji: '🌊' },
+  { id: 'moov',     label: 'Moov Money',       country: 'Multi',      color: 'bg-blue-500',    text: 'text-white',       border: 'border-blue-500',   ring: 'ring-blue-400',   emoji: '💙' },
+  { id: 'free',     label: 'Free Money',       country: 'Sénégal',    color: 'bg-red-600',     text: 'text-white',       border: 'border-red-600',    ring: 'ring-red-400',    emoji: '❤️' },
+  { id: 'airtel',   label: 'Airtel Money',     country: 'Multi',      color: 'bg-red-700',     text: 'text-white',       border: 'border-red-700',    ring: 'ring-red-500',    emoji: '📡' },
 ];
-const MOBILE_OPERATORS = ['Orange Money','MTN Mobile Money','Moov Money','Wave','Free Money','T-Money'];
 
-const APPT_STATUS_LABELS: Record<string,string> = {
-  pending:'En attente', confirmed:'Confirmé', completed:'Terminé',
-  cancelled:'Annulé', no_show:'Absent'
-};
-const APPT_TYPE_LABELS: Record<string,string> = {
-  in_person:'Présentiel', teleconsultation:'Téléconsultation', home_visit:'Domicile'
-};
+const PAYMENT_METHODS = [
+  { value: 'mobile_money',  label: 'Mobile Money',      icon: Smartphone, color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-200'  },
+  { value: 'bank_transfer', label: 'Virement bancaire', icon: Building2,  color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200'   },
+  { value: 'cash',          label: 'Espèces',           icon: Banknote,   color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
+  { value: 'check',         label: 'Chèque',            icon: Receipt,    color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d?: string) => {
@@ -82,42 +78,30 @@ const fmtDT = (d?: string) => {
   if (!d) return { date:'—', time:'—' };
   try {
     const dt = new Date(d);
-    return {
-      date: dt.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' }),
-      time: dt.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
-    };
+    return { date: dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}), time: dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) };
   } catch { return { date:'—', time:'—' }; }
 };
 
 const STATUS_STYLE: Record<string,string> = {
-  active:       'bg-green-100 text-green-700 border-green-200',
-  completed:    'bg-blue-100 text-blue-700 border-blue-200',
-  cancelled:    'bg-red-100 text-red-700 border-red-200',
-  pending:      'bg-yellow-100 text-yellow-700 border-yellow-200',
-  confirmed:    'bg-green-100 text-green-700 border-green-200',
-  scheduled:    'bg-indigo-100 text-indigo-700 border-indigo-200',
-  no_show:      'bg-gray-100 text-gray-600 border-gray-200',
-  missed:       'bg-gray-100 text-gray-600 border-gray-200',
-  failed:       'bg-red-100 text-red-700 border-red-200',
-  processing:   'bg-orange-100 text-orange-700 border-orange-200',
-  filled:       'bg-teal-100 text-teal-700 border-teal-200',
-  expired:      'bg-gray-100 text-gray-500 border-gray-200',
-  in_person:    'bg-blue-50 text-blue-600 border-blue-200',
-  teleconsultation:'bg-purple-50 text-purple-600 border-purple-200',
-  home_visit:   'bg-orange-50 text-orange-600 border-orange-200',
+  active:'bg-green-100 text-green-700 border-green-200', completed:'bg-blue-100 text-blue-700 border-blue-200',
+  cancelled:'bg-red-100 text-red-700 border-red-200',   pending:'bg-yellow-100 text-yellow-700 border-yellow-200',
+  scheduled:'bg-indigo-100 text-indigo-700 border-indigo-200', ongoing:'bg-cyan-100 text-cyan-700 border-cyan-200',
+  missed:'bg-gray-100 text-gray-600 border-gray-200',   failed:'bg-red-100 text-red-700 border-red-200',
+  processing:'bg-orange-100 text-orange-700 border-orange-200', filled:'bg-teal-100 text-teal-700 border-teal-200',
+  expired:'bg-gray-100 text-gray-500 border-gray-200',
 };
 const STATUS_LABEL: Record<string,string> = {
   active:'Actif', completed:'Terminé', cancelled:'Annulé', pending:'En attente',
-  confirmed:'Confirmé', scheduled:'Planifié', no_show:'Absent', missed:'Manqué',
-  failed:'Échoué', processing:'En traitement', filled:'Délivré', expired:'Expiré',
-  in_person:'Présentiel', teleconsultation:'Téléconsultation', home_visit:'Domicile',
+  scheduled:'Planifié', ongoing:'En cours', missed:'Manqué', failed:'Échoué',
+  processing:'En traitement', filled:'Délivré', expired:'Expiré',
 };
 
-// ─── Appel API natif (lit le token JWT) ───────────────────────────────────────
+// ─── Appel API brut (utilise le token JWT stocké) ─────────────────────────────
 const apiCall = async (path: string, options: RequestInit = {}): Promise<any> => {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  const BASE  = (import.meta as any).env?.VITE_API_URL || 'https://carnet-sante-backend.onrender.com/api';
-  const res   = await fetch(`${BASE}${path}`, {
+  const BASE = (import.meta as any).env?.VITE_API_URL || 'https://carnet-sante-backend.onrender.com/api';
+  const url  = `${BASE}${path}`;
+  const res  = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -130,18 +114,20 @@ const apiCall = async (path: string, options: RequestInit = {}): Promise<any> =>
   return data;
 };
 
-// ─── Micro-composants ─────────────────────────────────────────────────────────
+// ─── Sous-composants ──────────────────────────────────────────────────────────
 const Badge = ({ status }: { status: string }) => (
   <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${STATUS_STYLE[status] || STATUS_STYLE.pending}`}>
     {STATUS_LABEL[status] || status}
   </span>
 );
+
 const Spinner = ({ label = 'Chargement…' }: { label?: string }) => (
   <div className="flex items-center justify-center py-20 gap-3">
     <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
     <span className="text-gray-500 font-medium">{label}</span>
   </div>
 );
+
 const EmptyState = ({ icon: Icon, label, sub }: { icon: any; label: string; sub?: string }) => (
   <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
     <Icon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -149,18 +135,19 @@ const EmptyState = ({ icon: Icon, label, sub }: { icon: any; label: string; sub?
     {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
   </div>
 );
+
 const ApiError = ({ error, retry }: { error: string; retry: () => void }) => (
   <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center gap-3">
     <WifiOff className="w-10 h-10 text-red-400" />
-    <p className="text-red-700 font-semibold">Impossible de charger les données</p>
-    <p className="text-red-500 text-sm font-mono bg-red-100 px-3 py-1.5 rounded-lg max-w-md break-all text-center">{error}</p>
+    <p className="text-red-700 font-semibold text-center">Impossible de charger les données</p>
+    <p className="text-red-500 text-sm text-center font-mono bg-red-100 px-3 py-1.5 rounded-lg max-w-md break-all">{error}</p>
     <button onClick={retry} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium flex items-center gap-2">
       <RefreshCw className="w-4 h-4" /> Réessayer
     </button>
   </div>
 );
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
 const AdminDashboard: React.FC = () => {
   const { user, logout }     = useAuth();
   const { showNotification } = useNotification();
@@ -168,7 +155,7 @@ const AdminDashboard: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
 
-  // ── Données ───────────────────────────────────────────────────────────────
+  // ── État données ──
   const [stats, setStats] = useState<DashboardStats>({
     users: { total:0, doctors:0, patients:0, admins:0, active:0, inactive:0 },
     appointments: { total:0, pending:0, confirmed:0, completed:0, cancelled:0, today:0, thisWeek:0, thisMonth:0 },
@@ -176,35 +163,34 @@ const AdminDashboard: React.FC = () => {
     recentActivities: []
   });
   const [calendars, setCalendars]         = useState<CalendarItem[]>([]);
-  const [appointments, setAppointments]   = useState<AdminAppointment[]>([]);
   const [prescriptions, setPrescriptions] = useState<AdminPrescription[]>([]);
   const [videoCalls, setVideoCalls]       = useState<AdminVideoCall[]>([]);
   const [earnings, setEarnings]           = useState<DoctorEarning[]>([]);
   const [payments, setPayments]           = useState<DoctorPaymentRecord[]>([]);
 
-  // ── Loading / erreur ──────────────────────────────────────────────────────
+  // ── État chargement/erreur par tab ──
   const [dashLoading, setDashLoading]   = useState(true);
   const [tabLoading, setTabLoading]     = useState(false);
-  const [tabError,   setTabError]       = useState<string | null>(null);
+  const [tabError, setTabError]         = useState<string | null>(null);
 
-  // ── Filtres ───────────────────────────────────────────────────────────────
-  const [apptFilter,  setApptFilter]  = useState('');
-  const [apptStatus,  setApptStatus]  = useState('');
+  // ── Filtres ──
   const [prescFilter, setPrescFilter] = useState('');
   const [videoFilter, setVideoFilter] = useState('');
-  const [payFilter,   setPayFilter]   = useState('');
+  const [payFilter, setPayFilter]     = useState('');
 
-  // ── Modal paiement ────────────────────────────────────────────────────────
-  const [showPayModal,    setShowPayModal]    = useState(false);
-  const [selectedEarning, setSelectedEarning] = useState<DoctorEarning | null>(null);
-  const [payLoading,      setPayLoading]      = useState(false);
+  // ── Modal paiement ──
+  const [showPayModal,     setShowPayModal]     = useState(false);
+  const [payStep,          setPayStep]          = useState<1|2>(1);
+  const [selectedEarning,  setSelectedEarning]  = useState<DoctorEarning | null>(null);
+  const [selectedOperator, setSelectedOperator] = useState<string>('');
+  const [payLoading,       setPayLoading]       = useState(false);
   const [payForm, setPayForm] = useState({
     paymentMethod:'mobile_money', amount:'', currency:'XOF', period:'',
     consultationsCount:'', notes:'', bankName:'', accountNumber:'', iban:'',
     provider:'', phoneNumber:'', reference:''
   });
 
-  // ── Modal prescription ────────────────────────────────────────────────────
+  // ── Modal prescription ──
   const [selectedPresc, setSelectedPresc] = useState<AdminPrescription | null>(null);
 
   // ── Fetch dashboard ───────────────────────────────────────────────────────
@@ -215,29 +201,22 @@ const AdminDashboard: React.FC = () => {
         adminService.getDashboardStats(),
         calendarService.getAllCalendars()
       ]);
-      if (sRes.status === 'fulfilled' && sRes.value?.success) setStats(sRes.value.data);
-      if (cRes.status === 'fulfilled') setCalendars(cRes.value?.data || []);
-    } catch (e) { console.error('fetchDashboard:', e); }
-    finally { setDashLoading(false); }
+      if (sRes.status === 'fulfilled' && sRes.value.success) setStats(sRes.value.data);
+      if (cRes.status === 'fulfilled') setCalendars(cRes.value.data || []);
+    } catch (e) {
+      console.error('fetchDashboard:', e);
+    } finally {
+      setDashLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
-  // ── Fetch par onglet ──────────────────────────────────────────────────────
+  // ── Fetch par tab ─────────────────────────────────────────────────────────
   const fetchTab = useCallback(async (tab: Tab) => {
     setTabLoading(true);
     setTabError(null);
     try {
-      if (tab === 'appointments') {
-        // Essaie d'abord la route admin, sinon la route standard
-        try {
-          const r = await apiCall('/admin/appointments?limit=500');
-          setAppointments(Array.isArray(r.data) ? r.data : (Array.isArray(r.appointments) ? r.appointments : []));
-        } catch {
-          const r = await apiCall('/appointments?limit=500');
-          setAppointments(Array.isArray(r.data) ? r.data : (Array.isArray(r.appointments) ? r.appointments : []));
-        }
-      }
       if (tab === 'prescriptions') {
         const r = await apiCall('/admin/prescriptions?limit=200');
         setPrescriptions(Array.isArray(r.data) ? r.data : []);
@@ -255,12 +234,16 @@ const AdminDashboard: React.FC = () => {
         setPayments(Array.isArray(pR.data) ? pR.data : []);
       }
     } catch (e: any) {
-      setTabError(e?.message || 'Erreur inconnue');
-    } finally { setTabLoading(false); }
+      const msg = e?.message || 'Erreur inconnue';
+      console.error(`fetchTab(${tab}):`, msg);
+      setTabError(msg);
+    } finally {
+      setTabLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (['appointments','prescriptions','videocalls','payments'].includes(activeTab)) {
+    if (['prescriptions','videocalls','payments'].includes(activeTab)) {
       fetchTab(activeTab);
     }
   }, [activeTab, fetchTab]);
@@ -271,19 +254,21 @@ const AdminDashboard: React.FC = () => {
     try {
       await calendarService.deleteCalendar(id);
       setCalendars(p => p.filter(c => c.id !== id));
-      showNotification('✅ Calendrier supprimé', 'success');
-    } catch { showNotification('Erreur suppression', 'error'); }
+      showNotification('✅ Calendrier supprimé','success');
+    } catch { showNotification('Erreur suppression','error'); }
   };
 
   const openPayModal = (e: DoctorEarning) => {
     setSelectedEarning(e);
+    setPayStep(1);
+    setSelectedOperator('');
     setPayForm(f => ({
       ...f,
+      paymentMethod: 'mobile_money',
       amount: e.stats.amountDue.toString(),
       consultationsCount: e.stats.unpaidConsultations.toString(),
-      period: new Date().toLocaleDateString('fr-FR', { month:'long', year:'numeric' }),
+      period: new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'}),
       phoneNumber: e.doctor.phoneNumber || '',
-      // Reset détails
       bankName:'', accountNumber:'', iban:'', provider:'', reference:''
     }));
     setShowPayModal(true);
@@ -291,18 +276,15 @@ const AdminDashboard: React.FC = () => {
 
   const submitPayment = async () => {
     if (!selectedEarning || !payForm.amount || parseFloat(payForm.amount) <= 0) {
-      showNotification('Montant invalide', 'error'); return;
+      showNotification('Montant invalide','error'); return;
     }
     try {
       setPayLoading(true);
       const details: any = {};
-      if (payForm.paymentMethod === 'bank_transfer') {
-        details.bankName = payForm.bankName; details.accountNumber = payForm.accountNumber; details.iban = payForm.iban;
-      } else if (payForm.paymentMethod === 'mobile_money') {
-        details.provider = payForm.provider; details.phoneNumber = payForm.phoneNumber;
-      } else {
-        details.reference = payForm.reference;
-      }
+      if (payForm.paymentMethod === 'bank_transfer') { details.bankName = payForm.bankName; details.accountNumber = payForm.accountNumber; details.iban = payForm.iban; }
+      else if (payForm.paymentMethod === 'mobile_money') { details.provider = selectedOperator || payForm.provider; details.phoneNumber = payForm.phoneNumber; }
+      else { details.reference = payForm.reference; }
+
       await apiCall('/admin/doctor-payments', {
         method: 'POST',
         body: JSON.stringify({
@@ -316,11 +298,12 @@ const AdminDashboard: React.FC = () => {
           notes: payForm.notes
         })
       });
-      showNotification(`✅ Paiement effectué pour Dr. ${selectedEarning.doctor.lastName}`, 'success');
+
+      showNotification(`✅ Paiement de ${payForm.amount} ${payForm.currency} effectué pour Dr. ${selectedEarning.doctor.lastName}`,'success');
       setShowPayModal(false);
       await fetchTab('payments');
     } catch (e: any) {
-      showNotification(e?.message || 'Erreur paiement', 'error');
+      showNotification(e?.message || 'Erreur paiement','error');
     } finally { setPayLoading(false); }
   };
 
@@ -328,34 +311,30 @@ const AdminDashboard: React.FC = () => {
     if (window.confirm('Vous déconnecter ?')) { logout(); navigate('/login'); }
   };
 
-  // ── Filtres calculés ──────────────────────────────────────────────────────
-  const fAppts = appointments.filter(a => {
-    const q = apptFilter.toLowerCase();
-    const matchQ = !q || `${a.doctor?.firstName||''} ${a.doctor?.lastName||''} ${a.patient?.firstName||''} ${a.patient?.lastName||''}`.toLowerCase().includes(q);
-    const matchS = !apptStatus || a.status === apptStatus;
-    return matchQ && matchS;
-  });
-  const fPresc  = prescriptions.filter(p => { const q = prescFilter.toLowerCase(); return !q || `${p.doctor?.firstName||''} ${p.doctor?.lastName||''} ${p.patient?.firstName||''} ${p.patient?.lastName||''}`.toLowerCase().includes(q); });
-  const fVideos = videoCalls.filter(v => { const q = videoFilter.toLowerCase(); return !q || `${v.doctor?.firstName||''} ${v.doctor?.lastName||''} ${v.patient?.firstName||''} ${v.patient?.lastName||''}`.toLowerCase().includes(q); });
-  const fEarn   = earnings.filter(e => { const q = payFilter.toLowerCase(); return !q || `${e.doctor.firstName} ${e.doctor.lastName} ${e.doctor.specialty||''}`.toLowerCase().includes(q); });
+  // ── Données filtrées ──────────────────────────────────────────────────────
+  const fPresc  = (prescriptions || []).filter(p => { const q = prescFilter.toLowerCase(); return !q || `${p.doctor?.firstName||''} ${p.doctor?.lastName||''} ${p.patient?.firstName||''} ${p.patient?.lastName||''}`.toLowerCase().includes(q); });
+  const fVideos = (videoCalls || []).filter(v => { const q = videoFilter.toLowerCase(); return !q || `${v.doctor?.firstName||''} ${v.doctor?.lastName||''} ${v.patient?.firstName||''} ${v.patient?.lastName||''}`.toLowerCase().includes(q); });
+  const fEarn   = (earnings || []).filter(e => { const q = payFilter.toLowerCase(); return !q || `${e.doctor.firstName} ${e.doctor.lastName} ${e.doctor.specialty||''}`.toLowerCase().includes(q); });
 
-  const pendingPayCount  = earnings.filter(e => (e.stats?.amountDue || 0) > 0).length;
-  const unreadPrescCount = prescriptions.filter(p => !p.isRead).length;
+  const pendingPayCount  = (earnings || []).filter(e => e.stats?.amountDue > 0).length;
+  const unreadPrescCount = (prescriptions || []).filter(p => !p.isRead).length;
 
-  // ── Navigation ────────────────────────────────────────────────────────────
+  // ── Tabs navigation ───────────────────────────────────────────────────────
   const NAV: { id: Tab; label: string; icon: any; badge?: number }[] = [
-    { id:'dashboard',     label:'Tableau de bord', icon:BarChart3   },
-    { id:'doctors',       label:'Médecins',        icon:UserCheck   },
-    { id:'patients',      label:'Patients',        icon:Users       },
-    { id:'appointments',  label:'Rendez-vous',     icon:Calendar    },
-    { id:'prescriptions', label:'Ordonnances',     icon:Pill,        badge: unreadPrescCount },
-    { id:'videocalls',    label:'Appels vidéo',    icon:Video        },
-    { id:'payments',      label:'Paiements',       icon:DollarSign,  badge: pendingPayCount  },
-    { id:'financial',     label:'Finances',        icon:CreditCard   },
-    { id:'calendars',     label:'Calendriers',     icon:Calendar     },
+    { id:'dashboard',     label:'Tableau de bord', icon:BarChart3  },
+    { id:'doctors',       label:'Médecins',        icon:UserCheck  },
+    { id:'patients',      label:'Patients',        icon:Users      },
+    { id:'appointments',  label:'Rendez-vous',     icon:Calendar   },
+    { id:'prescriptions', label:'Ordonnances',     icon:Pill,       badge: unreadPrescCount },
+    { id:'videocalls',    label:'Appels vidéo',    icon:Video       },
+    { id:'payments',      label:'Paiements',       icon:DollarSign, badge: pendingPayCount  },
+    { id:'financial',     label:'Finances',        icon:CreditCard  },
+    { id:'calendars',     label:'Calendriers',     icon:Calendar    },
   ];
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
 
@@ -368,7 +347,7 @@ const AdminDashboard: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Administration</h1>
-              <p className="text-xs text-gray-500">Connecté en tant que {user?.firstName} {user?.lastName}</p>
+              <p className="text-xs text-gray-500">{user?.firstName} {user?.lastName}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -380,7 +359,7 @@ const AdminDashboard: React.FC = () => {
               {pendingPayCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse">{pendingPayCount}</span>}
             </div>
             <button onClick={handleLogout} className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm font-medium shadow-md transition-all">
-              <LogOut className="w-4 h-4" /> Déconnexion
+              <LogOut className="w-4 h-4"/> Déconnexion
             </button>
           </div>
         </div>
@@ -389,15 +368,25 @@ const AdminDashboard: React.FC = () => {
       {/* ── TABS ────────────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200 bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-1 overflow-x-auto py-2">
+          <nav className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
             {NAV.map(tab => {
-              const Icon = tab.icon; const active = activeTab === tab.id;
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
               return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`shrink-0 py-2.5 px-4 rounded-lg font-medium text-sm flex items-center gap-2 transition-all ${active ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative shrink-0 py-2.5 px-4 rounded-lg font-medium text-sm flex items-center gap-2 transition-all ${
+                    active ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
                   <Icon className="w-4 h-4" />
                   {tab.label}
-                  {tab.badge && tab.badge > 0 ? <span className="ml-0.5 px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full font-bold leading-none">{tab.badge}</span> : null}
+                  {tab.badge && tab.badge > 0 ? (
+                    <span className="ml-0.5 px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full font-bold leading-none">
+                      {tab.badge}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -408,22 +397,23 @@ const AdminDashboard: React.FC = () => {
       {/* ── CONTENU ─────────────────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        {/* ══ TABLEAU DE BORD ══ */}
+        {/* ══ DASHBOARD ══════════════════════════════════════════════════════ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             {dashLoading ? <Spinner /> : (
               <>
+                {/* Cards stats */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                   {[
                     { title:'Utilisateurs', value:stats.users.total, icon:Users, color:'from-blue-500 to-indigo-600',
-                      rows:[{l:'Médecins',v:stats.users.doctors},{l:'Patients',v:stats.users.patients},{l:'Admins',v:stats.users.admins},{l:'Actifs',v:stats.users.active},{l:'Inactifs',v:stats.users.inactive}] },
+                      rows:[{l:'Médecins',v:stats.users.doctors},{l:'Patients',v:stats.users.patients},{l:'Actifs',v:stats.users.active},{l:'Inactifs',v:stats.users.inactive}] },
                     { title:'Rendez-vous', value:stats.appointments.total, icon:Calendar, color:'from-orange-500 to-rose-500',
-                      rows:[{l:'En attente',v:stats.appointments.pending},{l:'Confirmés',v:stats.appointments.confirmed},{l:'Terminés',v:stats.appointments.completed},{l:'Annulés',v:stats.appointments.cancelled},{l:"Aujourd'hui",v:stats.appointments.today}] },
-                    { title:'Finances', value:`${stats.financial.totalRevenue} €`, icon:DollarSign, color:'from-emerald-500 to-teal-600',
-                      rows:[{l:'Commission',v:`${stats.financial.totalCommission} €`},{l:'En attente',v:`${stats.financial.pendingPayments} €`},{l:'Encaissé',v:`${stats.financial.completedPayments} €`}] },
+                      rows:[{l:'En attente',v:stats.appointments.pending},{l:'Confirmés',v:stats.appointments.confirmed},{l:'Terminés',v:stats.appointments.completed},{l:"Aujourd'hui",v:stats.appointments.today}] },
+                    { title:'Revenus', value:`${stats.financial.totalRevenue}€`, icon:DollarSign, color:'from-emerald-500 to-teal-600',
+                      rows:[{l:'Commission',v:`${stats.financial.totalCommission}€`},{l:'En attente',v:`${stats.financial.pendingPayments}€`},{l:'Encaissé',v:`${stats.financial.completedPayments}€`}] },
                     { title:'Calendriers', value:calendars.length, icon:Calendar, color:'from-violet-500 to-purple-600',
                       rows:[{l:'Confirmés',v:calendars.filter(c=>c.confirmed).length},{l:'En attente',v:calendars.filter(c=>!c.confirmed).length}] },
-                  ].map((c, i) => {
+                  ].map((c,i) => {
                     const Icon = c.icon;
                     return (
                       <div key={i} className="bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-xl hover:-translate-y-1 transition-all group">
@@ -433,16 +423,24 @@ const AdminDashboard: React.FC = () => {
                         </div>
                         <h3 className="text-base font-semibold text-gray-900 mb-3">{c.title}</h3>
                         <div className="space-y-1.5">
-                          {c.rows.map((r,j) => <div key={j} className="flex justify-between text-sm px-2 py-1.5 bg-gray-50 rounded-lg"><span className="text-gray-600">{r.l}</span><span className="font-semibold text-gray-900">{r.v}</span></div>)}
+                          {c.rows.map((r,j) => (
+                            <div key={j} className="flex justify-between text-sm px-2 py-1.5 bg-gray-50 rounded-lg">
+                              <span className="text-gray-600">{r.l}</span>
+                              <span className="font-semibold text-gray-900">{r.v}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     );
                   })}
                 </div>
 
+                {/* Activités + Calendriers */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100"><Activity className="w-5 h-5 text-blue-600"/>Activité récente</h3>
+                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100">
+                      <Activity className="w-5 h-5 text-blue-600"/> Activité récente
+                    </h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto">
                       {(stats.recentActivities || []).length === 0 ? (
                         <div className="text-center py-10"><Activity className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucune activité récente</p></div>
@@ -453,38 +451,49 @@ const AdminDashboard: React.FC = () => {
                             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shrink-0"><Activity className="w-4 h-4 text-white"/></div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{a.description}</p>
-                              <div className="flex items-center gap-2 mt-1"><span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{date} {time}</span><Badge status={a.status||'completed'}/></div>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{date} {time}</span>
+                                <Badge status={a.status || 'completed'} />
+                              </div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
+
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100"><Calendar className="w-5 h-5 text-purple-600"/>Derniers calendriers</h3>
+                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100">
+                      <Calendar className="w-5 h-5 text-purple-600"/> Derniers calendriers
+                    </h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto">
-                      {calendars.length === 0 ? <div className="text-center py-10"><Calendar className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucun calendrier</p></div>
-                        : calendars.slice(0,6).map(cal => (
-                          <div key={cal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-purple-200 transition">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 text-sm">{fmtDate(cal.date)}</p>
-                              <p className="text-xs text-gray-500">Dr. {cal.doctor?.firstName} {cal.doctor?.lastName}</p>
-                              <div className="flex gap-1 mt-1 flex-wrap">
-                                {(cal.slots||[]).slice(0,3).map((s,i)=><span key={i} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{s}</span>)}
-                                {(cal.slots||[]).length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">+{cal.slots.length-3}</span>}
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2 ml-3 shrink-0">
-                              <Badge status={cal.confirmed?'completed':'pending'}/>
-                              <button onClick={()=>handleDeleteCalendar(cal.id)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition border border-red-200"><Trash className="w-3.5 h-3.5"/></button>
+                      {calendars.length === 0 ? (
+                        <div className="text-center py-10"><Calendar className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucun calendrier</p></div>
+                      ) : calendars.slice(0,6).map(cal => (
+                        <div key={cal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-purple-200 transition">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm">{fmtDate(cal.date)}</p>
+                            <p className="text-xs text-gray-500">Dr. {cal.doctor?.firstName} {cal.doctor?.lastName}</p>
+                            <div className="flex gap-1 mt-1 flex-wrap">
+                              {(cal.slots||[]).slice(0,3).map((s,i) => <span key={i} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{s}</span>)}
+                              {(cal.slots||[]).length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">+{cal.slots.length-3}</span>}
                             </div>
                           </div>
-                        ))}
+                          <div className="flex flex-col items-end gap-2 ml-3 shrink-0">
+                            <Badge status={cal.confirmed ? 'completed' : 'pending'} />
+                            <button onClick={() => handleDeleteCalendar(cal.id)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition border border-red-200">
+                              <Trash className="w-3.5 h-3.5"/>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
 
+                {/* 3 mini-panels */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Répartition */}
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-blue-600"/>Répartition</h3>
                     <div className="space-y-3">
@@ -496,6 +505,7 @@ const AdminDashboard: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  {/* Statut RDV */}
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><Calendar className="w-5 h-5 text-orange-500"/>Statut RDV</h3>
                     <div className="space-y-2">
@@ -507,12 +517,13 @@ const AdminDashboard: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  {/* Finances */}
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-500"/>Finances</h3>
+                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-500"/>Performance financière</h3>
                     <div className="space-y-3">
                       <div className="bg-green-50 border border-green-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Revenus totaux</p><p className="text-2xl font-bold text-green-600">{stats.financial.totalRevenue} €</p></div>
                       <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Commission (10%)</p><p className="text-xl font-bold text-purple-600">{stats.financial.totalCommission} €</p></div>
-                      <div className="flex justify-between p-2.5 bg-gray-50 rounded-lg"><span className="text-sm text-gray-600">En attente</span><span className="font-semibold text-yellow-600 text-sm">{stats.financial.pendingPayments} €</span></div>
+                      <div className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg"><span className="text-sm text-gray-600">En attente</span><span className="font-semibold text-yellow-600 text-sm">{stats.financial.pendingPayments} €</span></div>
                     </div>
                   </div>
                 </div>
@@ -521,103 +532,183 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ MÉDECINS ══ */}
+        {/* ══ MÉDECINS ══════════════════════════════════════════════════════ */}
         {activeTab === 'doctors' && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-md"><UserCheck className="w-6 h-6 text-white"/></div><h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Gestion des médecins</h2></div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-md"><UserCheck className="w-6 h-6 text-white"/></div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Gestion des médecins</h2>
+            </div>
             <UserManagement userType="doctor"/>
           </div>
         )}
 
-        {/* ══ PATIENTS ══ */}
+        {/* ══ PATIENTS ══════════════════════════════════════════════════════ */}
         {activeTab === 'patients' && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl shadow-md"><Users className="w-6 h-6 text-white"/></div><h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Gestion des patients</h2></div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl shadow-md"><Users className="w-6 h-6 text-white"/></div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Gestion des patients</h2>
+            </div>
             <UserManagement userType="patient"/>
           </div>
         )}
 
-        {/* ══ RENDEZ-VOUS ══════════════════════════════════════════════════ */}
+        {/* ══ RENDEZ-VOUS ═══════════════════════════════════════════════════ */}
         {activeTab === 'appointments' && (
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><Calendar className="w-6 h-6 text-orange-500"/>Gestion des rendez-vous</h2>
+            <p className="text-gray-400">En cours de développement…</p>
+          </div>
+        )}
+
+        {/* ══ ORDONNANCES ═══════════════════════════════════════════════════ */}
+        {activeTab === 'prescriptions' && (
           <div className="space-y-5">
             {/* En-tête */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl shadow-md"><Calendar className="w-5 h-5 text-white"/></div>
-                <div><h2 className="text-xl font-bold text-gray-900">Tous les rendez-vous</h2><p className="text-sm text-gray-500">{appointments.length} au total</p></div>
-              </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Filtre statut */}
-                <select value={apptStatus} onChange={e=>setApptStatus(e.target.value)}
-                  className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white">
-                  <option value="">Tous les statuts</option>
-                  {Object.entries(APPT_STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
-                </select>
-                {/* Recherche */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                  <input type="text" placeholder="Médecin ou patient…" value={apptFilter} onChange={e=>setApptFilter(e.target.value)}
-                    className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 w-56 bg-white"/>
+                <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-md"><Pill className="w-5 h-5 text-white"/></div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Toutes les ordonnances</h2>
+                  <p className="text-sm text-gray-500">{prescriptions.length} au total</p>
                 </div>
-                <button onClick={()=>fetchTab('appointments')} className="p-2.5 bg-orange-50 border border-orange-200 text-orange-600 rounded-xl hover:bg-orange-100 transition">
-                  <RefreshCw className="w-4 h-4"/>
-                </button>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                <input type="text" placeholder="Médecin ou patient…"
+                  value={prescFilter} onChange={e => setPrescFilter(e.target.value)}
+                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-64 bg-white"
+                />
               </div>
             </div>
 
             {/* Mini-stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                {l:'Total',      v:appointments.length,                                         c:'from-gray-400 to-gray-500'},
-                {l:'En attente', v:appointments.filter(a=>a.status==='pending').length,          c:'from-yellow-500 to-amber-600'},
-                {l:'Confirmés',  v:appointments.filter(a=>a.status==='confirmed').length,        c:'from-green-500 to-emerald-600'},
-                {l:'Terminés',   v:appointments.filter(a=>a.status==='completed').length,        c:'from-blue-500 to-indigo-600'},
-                {l:'Annulés',    v:appointments.filter(a=>a.status==='cancelled').length,        c:'from-red-500 to-rose-600'},
-              ].map(({l,v,c})=>(
+                {l:'Total',      v:prescriptions.length,                              c:'from-gray-400 to-gray-500'},
+                {l:'Actives',    v:prescriptions.filter(p=>p.status==='active').length, c:'from-green-500 to-emerald-600'},
+                {l:'Non lues',   v:prescriptions.filter(p=>!p.isRead).length,          c:'from-orange-500 to-red-500'},
+                {l:'Terminées',  v:prescriptions.filter(p=>p.status==='completed' || p.status==='filled').length, c:'from-blue-500 to-indigo-600'},
+              ].map(({l,v,c}) => (
                 <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
-                  <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><Calendar className="w-5 h-5 text-white"/></div>
+                  <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><FileText className="w-5 h-5 text-white"/></div>
                   <div><p className="text-xs text-gray-500">{l}</p><p className="text-2xl font-bold text-gray-900">{v}</p></div>
                 </div>
               ))}
             </div>
 
-            {tabLoading ? <Spinner label="Chargement des rendez-vous…"/> :
-              tabError ? <ApiError error={tabError} retry={()=>fetchTab('appointments')}/> :
-              fAppts.length === 0 ? <EmptyState icon={Calendar} label="Aucun rendez-vous trouvé" sub="Les rendez-vous apparaîtront ici dès qu'un patient prendra rendez-vous"/> : (
+            {tabLoading ? <Spinner/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('prescriptions')}/> : fPresc.length === 0 ? (
+              <EmptyState icon={Pill} label="Aucune ordonnance trouvée" sub={prescriptions.length === 0 ? "Aucun médecin n'a encore créé d'ordonnance" : "Aucun résultat pour ce filtre"}/>
+            ) : (
               <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
-                <table className="w-full min-w-[750px]">
+                <table className="w-full min-w-[700px]">
                   <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>{['Date & Heure','Médecin','Patient','Type','Motif','Statut'].map(h=>(
+                    <tr>{['Date','Médecin','Patient','Médicaments','Statut','Lu','Voir'].map(h=>(
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                     ))}</tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {fAppts.map(a => {
-                      const {date, time} = fmtDT(a.appointmentDate);
+                    {fPresc.map(p => (
+                      <tr key={p.id} className={`hover:bg-gray-50 transition ${!p.isRead ? 'bg-orange-50/40' : ''}`}>
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p>
+                          <p className="text-xs text-gray-500">{p.doctor?.specialty}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-gray-900">{p.patient?.firstName} {p.patient?.lastName}</p>
+                          <p className="text-xs text-gray-500">{p.patient?.email}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {(p.medications||[]).slice(0,2).map((m,i)=>(
+                              <span key={i} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs">💊 {m.medication}</span>
+                            ))}
+                            {(p.medications||[]).length > 2 && <span className="text-xs text-gray-400">+{p.medications.length-2}</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3"><Badge status={p.status}/></td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${p.isRead ? 'bg-green-50 text-green-600 border-green-200' : 'bg-orange-50 text-orange-600 border-orange-200 animate-pulse'}`}>
+                            {p.isRead ? '✓ Lu' : '● Non lu'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={()=>setSelectedPresc(p)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition border border-blue-200">
+                            <Eye className="w-4 h-4"/>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ APPELS VIDÉO ══════════════════════════════════════════════════ */}
+        {activeTab === 'videocalls' && (
+          <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-md"><Video className="w-5 h-5 text-white"/></div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Tous les appels vidéo</h2>
+                  <p className="text-sm text-gray-500">{videoCalls.length} au total</p>
+                </div>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                <input type="text" placeholder="Médecin ou patient…"
+                  value={videoFilter} onChange={e => setVideoFilter(e.target.value)}
+                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-64 bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                {l:'Total',     v:videoCalls.length, c:'from-gray-400 to-gray-500'},
+                {l:'Terminés',  v:videoCalls.filter(v=>v.status==='completed').length, c:'from-green-500 to-emerald-600'},
+                {l:'Planifiés', v:videoCalls.filter(v=>v.status==='scheduled').length, c:'from-blue-500 to-indigo-600'},
+                {l:'Manqués',   v:videoCalls.filter(v=>v.status==='missed').length,    c:'from-red-500 to-rose-600'},
+              ].map(({l,v,c})=>(
+                <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><Video className="w-5 h-5 text-white"/></div>
+                  <div><p className="text-xs text-gray-500">{l}</p><p className="text-2xl font-bold text-gray-900">{v}</p></div>
+                </div>
+              ))}
+            </div>
+
+            {tabLoading ? <Spinner/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('videocalls')}/> : fVideos.length === 0 ? (
+              <EmptyState icon={Video} label="Aucun appel vidéo trouvé" sub="Les appels démarreront dès les premières consultations vidéo"/>
+            ) : (
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
+                <table className="w-full min-w-[600px]">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>{['Date','Médecin','Patient','Durée','Statut','Lien'].map(h=>(
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {fVideos.map(v => {
+                      const {date,time} = fmtDT(v.createdAt);
+                      const link = v.roomLink || v.meetingUrl;
+                      const dur  = v.durationMinutes || v.duration;
                       return (
-                        <tr key={a.id} className="hover:bg-gray-50 transition">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <p className="text-sm font-semibold text-gray-900">{date}</p>
-                            <p className="text-xs text-gray-500 flex items-center gap-1"><Clock className="w-3 h-3"/>{time}{a.duration ? ` · ${a.duration} min` : ''}</p>
-                          </td>
+                        <tr key={v.id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 whitespace-nowrap"><p className="text-sm font-medium text-gray-900">{date}</p><p className="text-xs text-gray-500">{time}</p></td>
+                          <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {v.doctor?.firstName} {v.doctor?.lastName}</p><p className="text-xs text-gray-500">{v.doctor?.specialty}</p></td>
+                          <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{v.patient?.firstName} {v.patient?.lastName}</p><p className="text-xs text-gray-500">{v.patient?.phoneNumber}</p></td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{dur ? `${dur} min` : '—'}</td>
+                          <td className="px-4 py-3"><Badge status={v.status}/></td>
                           <td className="px-4 py-3">
-                            <p className="text-sm font-medium text-gray-900">Dr. {a.doctor?.firstName} {a.doctor?.lastName}</p>
-                            <p className="text-xs text-gray-500">{a.doctor?.specialty}</p>
+                            {link ? (
+                              <a href={link} target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 transition">Rejoindre</a>
+                            ) : <span className="text-gray-400 text-xs">—</span>}
                           </td>
-                          <td className="px-4 py-3">
-                            <p className="text-sm font-medium text-gray-900">{a.patient?.firstName} {a.patient?.lastName}</p>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              {a.patient?.email    && <span className="text-xs text-gray-400 flex items-center gap-0.5"><Mail className="w-3 h-3"/>{a.patient.email}</span>}
-                              {a.patient?.phoneNumber && <span className="text-xs text-gray-400 flex items-center gap-0.5"><Phone className="w-3 h-3"/>{a.patient.phoneNumber}</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge status={a.type}/>
-                          </td>
-                          <td className="px-4 py-3 max-w-[180px]">
-                            <p className="text-sm text-gray-700 truncate" title={a.reason||'—'}>{a.reason || '—'}</p>
-                          </td>
-                          <td className="px-4 py-3"><Badge status={a.status}/></td>
                         </tr>
                       );
                     })}
@@ -628,108 +719,18 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ ORDONNANCES ══ */}
-        {activeTab === 'prescriptions' && (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-md"><Pill className="w-5 h-5 text-white"/></div>
-                <div><h2 className="text-xl font-bold text-gray-900">Toutes les ordonnances</h2><p className="text-sm text-gray-500">{prescriptions.length} au total</p></div>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                <input type="text" placeholder="Médecin ou patient…" value={prescFilter} onChange={e=>setPrescFilter(e.target.value)}
-                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-64 bg-white"/>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[{l:'Total',v:prescriptions.length,c:'from-gray-400 to-gray-500'},{l:'Actives',v:prescriptions.filter(p=>p.status==='active').length,c:'from-green-500 to-emerald-600'},{l:'Non lues',v:prescriptions.filter(p=>!p.isRead).length,c:'from-orange-500 to-red-500'},{l:'Terminées',v:prescriptions.filter(p=>['completed','filled'].includes(p.status)).length,c:'from-blue-500 to-indigo-600'}].map(({l,v,c})=>(
-                <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
-                  <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><FileText className="w-5 h-5 text-white"/></div>
-                  <div><p className="text-xs text-gray-500">{l}</p><p className="text-2xl font-bold text-gray-900">{v}</p></div>
-                </div>
-              ))}
-            </div>
-            {tabLoading ? <Spinner/> : tabError ? <ApiError error={tabError} retry={()=>fetchTab('prescriptions')}/> :
-              fPresc.length === 0 ? <EmptyState icon={Pill} label="Aucune ordonnance" sub="Les ordonnances apparaîtront ici dès qu'un médecin en crée une"/> : (
-              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
-                <table className="w-full min-w-[700px]">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>{['Date','Médecin','Patient','Médicaments','Statut','Lu','Voir'].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {fPresc.map(p=>(
-                      <tr key={p.id} className={`hover:bg-gray-50 transition ${!p.isRead?'bg-orange-50/40':''}`}>
-                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
-                        <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p><p className="text-xs text-gray-500">{p.doctor?.specialty}</p></td>
-                        <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{p.patient?.firstName} {p.patient?.lastName}</p><p className="text-xs text-gray-500">{p.patient?.email}</p></td>
-                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{(p.medications||[]).slice(0,2).map((m,i)=><span key={i} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs">💊 {m.medication}</span>)}{(p.medications||[]).length>2&&<span className="text-xs text-gray-400">+{p.medications.length-2}</span>}</div></td>
-                        <td className="px-4 py-3"><Badge status={p.status}/></td>
-                        <td className="px-4 py-3"><span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${p.isRead?'bg-green-50 text-green-600 border-green-200':'bg-orange-50 text-orange-600 border-orange-200'}`}>{p.isRead?'✓ Lu':'● Non lu'}</span></td>
-                        <td className="px-4 py-3"><button onClick={()=>setSelectedPresc(p)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition border border-blue-200"><Eye className="w-4 h-4"/></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ══ APPELS VIDÉO ══ */}
-        {activeTab === 'videocalls' && (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-md"><Video className="w-5 h-5 text-white"/></div>
-                <div><h2 className="text-xl font-bold text-gray-900">Tous les appels vidéo</h2><p className="text-sm text-gray-500">{videoCalls.length} au total</p></div>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                <input type="text" placeholder="Médecin ou patient…" value={videoFilter} onChange={e=>setVideoFilter(e.target.value)}
-                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-64 bg-white"/>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[{l:'Total',v:videoCalls.length,c:'from-gray-400 to-gray-500'},{l:'Terminés',v:videoCalls.filter(v=>v.status==='completed').length,c:'from-green-500 to-emerald-600'},{l:'Planifiés',v:videoCalls.filter(v=>v.status==='scheduled').length,c:'from-blue-500 to-indigo-600'},{l:'Manqués',v:videoCalls.filter(v=>v.status==='missed').length,c:'from-red-500 to-rose-600'}].map(({l,v,c})=>(
-                <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
-                  <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><Video className="w-5 h-5 text-white"/></div>
-                  <div><p className="text-xs text-gray-500">{l}</p><p className="text-2xl font-bold text-gray-900">{v}</p></div>
-                </div>
-              ))}
-            </div>
-            {tabLoading ? <Spinner/> : tabError ? <ApiError error={tabError} retry={()=>fetchTab('videocalls')}/> :
-              fVideos.length === 0 ? <EmptyState icon={Video} label="Aucun appel vidéo"/> : (
-              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
-                <table className="w-full min-w-[600px]">
-                  <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Date','Médecin','Patient','Durée','Statut','Lien'].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr></thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {fVideos.map(v=>{const {date,time}=fmtDT(v.createdAt);const link=v.roomLink||v.meetingUrl;const dur=v.durationMinutes||v.duration;return(
-                      <tr key={v.id} className="hover:bg-gray-50 transition">
-                        <td className="px-4 py-3 whitespace-nowrap"><p className="text-sm font-medium text-gray-900">{date}</p><p className="text-xs text-gray-500">{time}</p></td>
-                        <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {v.doctor?.firstName} {v.doctor?.lastName}</p><p className="text-xs text-gray-500">{v.doctor?.specialty}</p></td>
-                        <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{v.patient?.firstName} {v.patient?.lastName}</p><p className="text-xs text-gray-500">{v.patient?.phoneNumber}</p></td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{dur?`${dur} min`:'—'}</td>
-                        <td className="px-4 py-3"><Badge status={v.status}/></td>
-                        <td className="px-4 py-3">{link?<a href={link} target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 transition">Rejoindre</a>:<span className="text-gray-400 text-xs">—</span>}</td>
-                      </tr>
-                    );})}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ══ PAIEMENTS ════════════════════════════════════════════════════ */}
+        {/* ══ PAIEMENTS ═════════════════════════════════════════════════════ */}
         {activeTab === 'payments' && (
           <div className="space-y-6">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md"><DollarSign className="w-5 h-5 text-white"/></div>
-              <div><h2 className="text-xl font-bold text-gray-900">Paiements des médecins</h2><p className="text-sm text-gray-500">Gérez les versements et suivez les soldes</p></div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Paiements des médecins</h2>
+                <p className="text-sm text-gray-500">Gérez les versements et suivez les soldes</p>
+              </div>
             </div>
 
-            {tabLoading ? <Spinner label="Calcul des revenus…"/> : tabError ? <ApiError error={tabError} retry={()=>fetchTab('payments')}/> : (
+            {tabLoading ? <Spinner label="Calcul des revenus…"/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('payments')}/> : (
               <>
                 {/* KPIs */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -750,19 +751,21 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Revenus par médecin */}
+                {/* Filtre + liste */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                    <input type="text" placeholder="Filtrer…" value={payFilter} onChange={e=>setPayFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-300 w-56 bg-white"/>
+                    <input type="text" placeholder="Filtrer par médecin…"
+                      value={payFilter} onChange={e => setPayFilter(e.target.value)}
+                      className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-300 w-64 bg-white"
+                    />
                   </div>
                 </div>
 
-                {fEarn.length === 0
-                  ? <EmptyState icon={Users} label="Aucun médecin enregistré"/>
-                  : (
+                {fEarn.length === 0 ? (
+                  <EmptyState icon={Users} label="Aucun médecin enregistré" sub="Les médecins apparaîtront ici dès leur inscription"/>
+                ) : (
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
                     <div className="divide-y divide-gray-100">
                       {fEarn.map(e => (
@@ -780,29 +783,51 @@ const AdminDashboard: React.FC = () => {
                               </div>
                             </div>
                             {/* Chiffres */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                              <div className="text-center p-2 bg-gray-50 rounded-xl"><p className="text-xs text-gray-500">Consultations</p><p className="font-bold text-gray-900 text-xl">{e.stats.completedConsultations}</p><p className="text-xs text-gray-400">{e.stats.paidConsultations} payées</p></div>
-                              <div className="text-center p-2 bg-blue-50 border border-blue-100 rounded-xl"><p className="text-xs text-blue-500">Part (90%)</p><p className="font-bold text-blue-700 text-lg">{e.stats.doctorShare}</p><p className="text-xs text-blue-400">XOF</p></div>
-                              <div className="text-center p-2 bg-green-50 border border-green-100 rounded-xl"><p className="text-xs text-green-500">Versé</p><p className="font-bold text-green-700 text-lg">{e.stats.totalPaid}</p><p className="text-xs text-green-400">XOF</p></div>
-                              <div className={`text-center p-2 rounded-xl border ${e.stats.amountDue>0?'bg-red-50 border-red-200':'bg-gray-50 border-gray-100'}`}>
-                                <p className={`text-xs ${e.stats.amountDue>0?'text-red-500':'text-gray-400'}`}>Restant dû</p>
-                                <p className={`font-bold text-xl ${e.stats.amountDue>0?'text-red-600':'text-gray-300'}`}>{e.stats.amountDue}</p>
-                                <p className={`text-xs ${e.stats.amountDue>0?'text-red-400':'text-gray-300'}`}>XOF</p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-4">
+                              <div className="text-center p-2 bg-gray-50 rounded-xl">
+                                <p className="text-xs text-gray-500 leading-tight">Consultations</p>
+                                <p className="font-bold text-gray-900 text-xl">{e.stats.completedConsultations}</p>
+                                <p className="text-xs text-gray-400">{e.stats.paidConsultations} payées</p>
+                              </div>
+                              <div className="text-center p-2 bg-blue-50 border border-blue-100 rounded-xl">
+                                <p className="text-xs text-blue-500 leading-tight">Part (90%)</p>
+                                <p className="font-bold text-blue-700 text-lg">{e.stats.doctorShare}</p>
+                                <p className="text-xs text-blue-400">XOF</p>
+                              </div>
+                              <div className="text-center p-2 bg-green-50 border border-green-100 rounded-xl">
+                                <p className="text-xs text-green-500 leading-tight">Versé</p>
+                                <p className="font-bold text-green-700 text-lg">{e.stats.totalPaid}</p>
+                                <p className="text-xs text-green-400">XOF</p>
+                              </div>
+                              <div className={`text-center p-2 rounded-xl border ${e.stats.amountDue > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
+                                <p className={`text-xs leading-tight ${e.stats.amountDue > 0 ? 'text-red-500' : 'text-gray-400'}`}>Restant dû</p>
+                                <p className={`font-bold text-xl ${e.stats.amountDue > 0 ? 'text-red-600' : 'text-gray-300'}`}>{e.stats.amountDue}</p>
+                                <p className={`text-xs ${e.stats.amountDue > 0 ? 'text-red-400' : 'text-gray-300'}`}>XOF</p>
                               </div>
                             </div>
-                            {/* Bouton payer */}
-                            <button onClick={()=>openPayModal(e)} disabled={e.stats.amountDue<=0}
-                              className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${e.stats.amountDue>0?'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:scale-105 shadow-md':'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
-                              <Send className="w-4 h-4"/>{e.stats.amountDue>0?'Payer':'✓ À jour'}
+                            {/* Bouton */}
+                            <button
+                              onClick={() => openPayModal(e)}
+                              disabled={e.stats.amountDue <= 0}
+                              className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${
+                                e.stats.amountDue > 0
+                                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:scale-105 shadow-md'
+                                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              }`}
+                            >
+                              <Send className="w-4 h-4"/>
+                              {e.stats.amountDue > 0 ? 'Payer' : '✓ À jour'}
                             </button>
                           </div>
-                          {/* Historique rapide */}
+                          {/* Historique mini */}
                           {(e.paymentHistory||[]).length > 0 && (
                             <div className="mt-3 ml-16 flex flex-wrap gap-2">
                               {e.paymentHistory.slice(0,3).map((p:any,i:number)=>(
-                                <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs">✓ {p.amount} {p.currency||'XOF'} — {p.period||fmtDate(p.processedAt)}</span>
+                                <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs">
+                                  ✓ {p.amount} {p.currency||'XOF'} — {p.period || fmtDate(p.processedAt)}
+                                </span>
                               ))}
-                              {e.paymentHistory.length>3&&<span className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-full text-xs">+{e.paymentHistory.length-3}</span>}
+                              {e.paymentHistory.length > 3 && <span className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-full text-xs">+{e.paymentHistory.length-3}</span>}
                             </div>
                           )}
                         </div>
@@ -811,31 +836,26 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* ── HISTORIQUE GLOBAL — toujours visible ─────────────────── */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                    <Receipt className="w-5 h-5 text-gray-500"/>
-                    <h3 className="font-semibold text-gray-900">Historique de tous les paiements</h3>
-                    <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
-                  </div>
-                  {payments.length === 0 ? (
-                    <div className="text-center py-10">
-                      <Receipt className="w-10 h-10 text-gray-200 mx-auto mb-2"/>
-                      <p className="text-sm text-gray-400">Aucun paiement effectué pour l'instant</p>
+                {/* Historique global */}
+                {payments.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
+                      <Receipt className="w-5 h-5 text-gray-500"/>
+                      <h3 className="font-semibold text-gray-900">Historique complet des paiements</h3>
+                      <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
                     </div>
-                  ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[600px]">
                         <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>{['Date','Médecin','Montant','Méthode','Période','Statut','Traité par'].map(h=>(
+                          <tr>{['Date','Médecin','Montant','Méthode','Période','Statut'].map(h=>(
                             <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                           ))}</tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {payments.map(p=>{
-                            const method=PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
-                            const MI=method?.icon||Banknote;
-                            return(
+                          {payments.map(p => {
+                            const method = PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
+                            const MI = method?.icon || Banknote;
+                            return (
                               <tr key={p.id} className="hover:bg-gray-50 transition">
                                 <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
                                 <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p><p className="text-xs text-gray-500">{p.doctor?.specialty}</p></td>
@@ -843,60 +863,84 @@ const AdminDashboard: React.FC = () => {
                                 <td className="px-4 py-3"><span className={`flex items-center gap-1.5 text-sm ${method?.color||'text-gray-600'}`}><MI className="w-4 h-4"/>{method?.label||p.paymentMethod}</span></td>
                                 <td className="px-4 py-3 text-sm text-gray-600">{p.period||'—'}</td>
                                 <td className="px-4 py-3"><Badge status={p.status}/></td>
-                                <td className="px-4 py-3 text-xs text-gray-500">{p.processor?`${p.processor.firstName} ${p.processor.lastName}`:'—'}</td>
                               </tr>
                             );
                           })}
                         </tbody>
                       </table>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </>
             )}
           </div>
         )}
 
-        {/* ══ FINANCES ══ */}
+        {/* ══ FINANCES ══════════════════════════════════════════════════════ */}
         {activeTab === 'financial' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-green-500"/>Revenus globaux</h3>
               <div className="space-y-3">
-                {[{l:'Revenus totaux',v:`${stats.financial.totalRevenue} €`,c:'text-green-600',bg:'bg-green-50 border-green-200',big:true},{l:'Commission (10%)',v:`${stats.financial.totalCommission} €`,c:'text-purple-600',bg:'bg-purple-50 border-purple-200'},{l:'En attente',v:`${stats.financial.pendingPayments} €`,c:'text-yellow-600',bg:'bg-yellow-50 border-yellow-200'},{l:'Encaissé',v:`${stats.financial.completedPayments} €`,c:'text-blue-600',bg:'bg-blue-50 border-blue-200'}].map(({l,v,c,bg,big})=>(
-                  <div key={l} className={`flex justify-between items-center p-4 rounded-xl border ${bg}`}><span className="text-gray-600 text-sm">{l}</span><span className={`font-bold ${big?'text-2xl':'text-base'} ${c}`}>{v}</span></div>
+                {[
+                  {l:'Revenus totaux',     v:`${stats.financial.totalRevenue} €`,      c:'text-green-600', bg:'bg-green-50 border-green-200',   big:true},
+                  {l:'Commission (10%)',   v:`${stats.financial.totalCommission} €`,   c:'text-purple-600',bg:'bg-purple-50 border-purple-200'       },
+                  {l:'Paiements en attente',v:`${stats.financial.pendingPayments} €`,  c:'text-yellow-600',bg:'bg-yellow-50 border-yellow-200'       },
+                  {l:'Paiements complétés',v:`${stats.financial.completedPayments} €`, c:'text-blue-600',  bg:'bg-blue-50 border-blue-200'           },
+                ].map(({l,v,c,bg,big})=>(
+                  <div key={l} className={`flex justify-between items-center p-4 rounded-xl border ${bg}`}>
+                    <span className="text-gray-600 text-sm">{l}</span>
+                    <span className={`font-bold ${big?'text-2xl':'text-base'} ${c}`}>{v}</span>
+                  </div>
                 ))}
               </div>
             </div>
             <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-blue-500"/>Statistiques RDV</h3>
               <div className="space-y-3">
-                {[{l:'Total RDV',v:stats.appointments.total,c:'text-gray-900',bg:'bg-gray-50 border-gray-200',big:true},{l:'Ce mois',v:stats.appointments.thisMonth||0,c:'text-blue-600',bg:'bg-blue-50 border-blue-200'},{l:'Cette semaine',v:stats.appointments.thisWeek||0,c:'text-indigo-600',bg:'bg-indigo-50 border-indigo-200'},{l:'Annulés',v:stats.appointments.cancelled,c:'text-red-500',bg:'bg-red-50 border-red-200'}].map(({l,v,c,bg,big})=>(
-                  <div key={l} className={`flex justify-between items-center p-4 rounded-xl border ${bg}`}><span className="text-gray-600 text-sm">{l}</span><span className={`font-bold ${big?'text-2xl':'text-base'} ${c}`}>{v}</span></div>
+                {[
+                  {l:'Total RDV',    v:stats.appointments.total,              c:'text-gray-900', bg:'bg-gray-50 border-gray-200',   big:true},
+                  {l:'Ce mois',      v:stats.appointments.thisMonth||0,        c:'text-blue-600', bg:'bg-blue-50 border-blue-200'       },
+                  {l:'Cette semaine',v:stats.appointments.thisWeek||0,         c:'text-indigo-600',bg:'bg-indigo-50 border-indigo-200'  },
+                  {l:'Annulés',      v:stats.appointments.cancelled,           c:'text-red-500',  bg:'bg-red-50 border-red-200'         },
+                ].map(({l,v,c,bg,big})=>(
+                  <div key={l} className={`flex justify-between items-center p-4 rounded-xl border ${bg}`}>
+                    <span className="text-gray-600 text-sm">{l}</span>
+                    <span className={`font-bold ${big?'text-2xl':'text-base'} ${c}`}>{v}</span>
+                  </div>
                 ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* ══ CALENDRIERS ══ */}
+        {/* ══ CALENDRIERS ═══════════════════════════════════════════════════ */}
         {activeTab === 'calendars' && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-gray-900">Gestion des calendriers ({calendars.length})</h2>
-            {calendars.length === 0 ? <EmptyState icon={Calendar} label="Aucun calendrier"/> : (
+            {calendars.length === 0 ? (
+              <EmptyState icon={Calendar} label="Aucun calendrier" sub="Les médecins n'ont pas encore créé de disponibilités"/>
+            ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {calendars.map(cal=>(
+                {calendars.map(cal => (
                   <div key={cal.id} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-xl hover:-translate-y-1 transition-all">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg shadow-md"><Calendar className="w-5 h-5 text-white"/></div>
-                        <div><p className="font-bold text-gray-900">{fmtDate(cal.date)}</p><p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5"><Award className="w-3.5 h-3.5 text-purple-400"/>Dr. {cal.doctor?.firstName} {cal.doctor?.lastName}</p></div>
+                        <div>
+                          <p className="font-bold text-gray-900">{fmtDate(cal.date)}</p>
+                          <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5"><Award className="w-3.5 h-3.5 text-purple-400"/>Dr. {cal.doctor?.firstName} {cal.doctor?.lastName}</p>
+                        </div>
                       </div>
-                      <Badge status={cal.confirmed?'completed':'pending'}/>
+                      <Badge status={cal.confirmed ? 'completed' : 'pending'}/>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 mb-4">{(cal.slots||[]).map((s,i)=><span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium">{s}</span>)}</div>
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {(cal.slots||[]).map((s,i)=><span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium">{s}</span>)}
+                    </div>
                     <div className="flex justify-end border-t border-gray-100 pt-3">
-                      <button onClick={()=>handleDeleteCalendar(cal.id)} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium flex items-center gap-2"><Trash className="w-4 h-4"/>Supprimer</button>
+                      <button onClick={() => handleDeleteCalendar(cal.id)} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium flex items-center gap-2">
+                        <Trash className="w-4 h-4"/> Supprimer
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -906,143 +950,262 @@ const AdminDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* ══════════════ MODAL PAIEMENT ══════════════════════════════════════ */}
+      {/* ══════════════ MODAL PAIEMENT — 2 ÉTAPES ════════════════════════════ */}
       {showPayModal && selectedEarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Payer Dr. {selectedEarning.doctor.firstName} {selectedEarning.doctor.lastName}</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{selectedEarning.doctor.specialty}</p>
+          <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+            {/* ── Header ── */}
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md text-white font-bold text-lg">
+                  {selectedEarning.doctor.firstName[0]}{selectedEarning.doctor.lastName[0]}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Payer Dr. {selectedEarning.doctor.firstName} {selectedEarning.doctor.lastName}
+                  </h2>
+                  <p className="text-xs text-gray-500">{selectedEarning.doctor.specialty}</p>
+                </div>
               </div>
-              <button onClick={()=>setShowPayModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition"><X className="w-5 h-5 text-gray-500"/></button>
+              <button onClick={() => setShowPayModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition">
+                <X className="w-5 h-5 text-gray-500"/>
+              </button>
             </div>
 
-            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              {/* Résumé */}
-              <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                {[{l:'Consult. non payées',v:selectedEarning.stats.unpaidConsultations,c:'text-gray-900'},{l:'Montant suggéré',v:`${selectedEarning.stats.amountDue} XOF`,c:'text-green-600'},{l:'Part médecin',v:'90%',c:'text-blue-600'}].map(({l,v,c})=>(
-                  <div key={l} className="text-center"><p className="text-xs text-gray-500 mb-1 leading-tight">{l}</p><p className={`text-xl font-bold ${c}`}>{v}</p></div>
-                ))}
-              </div>
+            {/* ── Stepper ── */}
+            <div className="flex items-center gap-2 px-6 pt-4 pb-2">
+              {[{n:1,l:'Méthode de paiement'},{n:2,l:'Détails & confirmation'}].map(({n,l})=>(
+                <React.Fragment key={n}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${payStep>=n?'bg-green-500 text-white shadow-md':'bg-gray-200 text-gray-500'}`}>{n}</div>
+                    <span className={`text-xs font-medium transition-colors ${payStep>=n?'text-green-600':'text-gray-400'}`}>{l}</span>
+                  </div>
+                  {n<2 && <div className={`flex-1 h-0.5 transition-all ${payStep>=2?'bg-green-400':'bg-gray-200'}`}/>}
+                </React.Fragment>
+              ))}
+            </div>
 
-              {/* Montant + devise */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Montant *</label>
-                  <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="0"/>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Devise</label>
-                  <select value={payForm.currency} onChange={e=>setPayForm(f=>({...f,currency:e.target.value}))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
-                    {['XOF','EUR','USD','GHS','XAF'].map(c=><option key={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Période</label>
-                  <input type="text" value={payForm.period} onChange={e=>setPayForm(f=>({...f,period:e.target.value}))}
-                    placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Nb consultations</label>
-                  <input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
-                </div>
-              </div>
+            <div className="p-6 max-h-[65vh] overflow-y-auto">
 
-              {/* ── Méthode de paiement ── */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Méthode de paiement *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {PAYMENT_METHODS.map(m => {
-                    const Icon = m.icon;
-                    const active = payForm.paymentMethod === m.value;
-                    return (
-                      <button key={m.value} type="button"
-                        onClick={() => setPayForm(f => ({ ...f, paymentMethod: m.value }))}
-                        className={`p-3 border-2 rounded-xl flex items-center gap-2 transition-all text-sm font-medium ${active ? 'border-green-500 bg-green-50 text-green-700 shadow-md' : 'border-gray-200 text-gray-600 hover:border-green-300 hover:bg-green-50/30'}`}>
-                        <Icon className={`w-5 h-5 ${active ? 'text-green-600' : m.color}`}/>
-                        {m.label}
-                        {active && <CheckCircle className="w-4 h-4 ml-auto text-green-500"/>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* ══════ ÉTAPE 1 : Méthode de paiement ══════ */}
+              {payStep === 1 && (
+                <div className="space-y-5">
+                  {/* Résumé médecin */}
+                  <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    {[
+                      {l:'Consultations impayées', v:selectedEarning.stats.unpaidConsultations, c:'text-gray-900'},
+                      {l:'Montant dû',             v:`${selectedEarning.stats.amountDue} XOF`,  c:'text-red-600'},
+                      {l:'Part médecin',           v:'90%',                                      c:'text-blue-600'},
+                    ].map(({l,v,c})=>(
+                      <div key={l} className="text-center"><p className="text-xs text-gray-500 leading-tight mb-1">{l}</p><p className={`text-xl font-bold ${c}`}>{v}</p></div>
+                    ))}
+                  </div>
 
-              {/* ── Détails selon méthode ── */}
-              {payForm.paymentMethod === 'bank_transfer' && (
-                <div className="space-y-2 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                  <p className="text-sm font-semibold text-blue-700 flex items-center gap-2"><Building2 className="w-4 h-4"/>Informations bancaires</p>
-                  <input placeholder="Nom de la banque *" value={payForm.bankName} onChange={e=>setPayForm(f=>({...f,bankName:e.target.value}))}
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
-                  <input placeholder="Numéro de compte *" value={payForm.accountNumber} onChange={e=>setPayForm(f=>({...f,accountNumber:e.target.value}))}
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
-                  <input placeholder="IBAN (optionnel)" value={payForm.iban} onChange={e=>setPayForm(f=>({...f,iban:e.target.value}))}
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
+                  {/* Choix méthode principale */}
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-3">Comment souhaitez-vous payer ?</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {PAYMENT_METHODS.map(m => {
+                        const Icon = m.icon;
+                        const active = payForm.paymentMethod === m.value;
+                        return (
+                          <button key={m.value} type="button"
+                            onClick={() => { setPayForm(f=>({...f,paymentMethod:m.value})); setSelectedOperator(''); }}
+                            className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all font-medium ${active?`border-green-500 ${m.bg} shadow-md`:`border-gray-200 hover:border-gray-300 hover:bg-gray-50`}`}>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${active?'bg-green-500 shadow-md':'bg-gray-100'}`}>
+                              <Icon className={`w-5 h-5 ${active?'text-white':m.color}`}/>
+                            </div>
+                            <div className="text-left">
+                              <p className={`text-sm font-semibold ${active?'text-green-700':'text-gray-700'}`}>{m.label}</p>
+                            </div>
+                            {active && <CheckCircle className="w-5 h-5 text-green-500 ml-auto"/>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Si mobile money → grille opérateurs */}
+                  {payForm.paymentMethod === 'mobile_money' && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-green-500"/>
+                        Choisissez l'opérateur
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {MOBILE_OPERATORS.map(op => {
+                          const active = selectedOperator === op.id;
+                          return (
+                            <button key={op.id} type="button"
+                              onClick={() => setSelectedOperator(op.id)}
+                              className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all font-medium ${active?`border-green-500 bg-green-50 shadow-md`:'border-gray-200 hover:border-gray-300 bg-white'}`}>
+                              <div className={`w-10 h-10 ${op.color} rounded-xl flex items-center justify-center text-xl shadow-sm shrink-0`}>
+                                {op.emoji}
+                              </div>
+                              <div className="text-left min-w-0">
+                                <p className={`text-sm font-semibold truncate ${active?'text-green-700':'text-gray-800'}`}>{op.label}</p>
+                                <p className="text-xs text-gray-400 truncate">{op.country}</p>
+                              </div>
+                              {active && <CheckCircle className="w-4 h-4 text-green-500 ml-auto shrink-0"/>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bouton Suivant */}
+                  <button type="button"
+                    onClick={() => setPayStep(2)}
+                    disabled={payForm.paymentMethod==='mobile_money' && !selectedOperator}
+                    className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    Continuer →
+                    {payForm.paymentMethod==='mobile_money' && !selectedOperator && (
+                      <span className="text-xs text-green-200 ml-1">(choisir un opérateur)</span>
+                    )}
+                  </button>
                 </div>
               )}
 
-              {payForm.paymentMethod === 'mobile_money' && (
-                <div className="space-y-2 p-4 bg-green-50 rounded-xl border border-green-200">
-                  <p className="text-sm font-semibold text-green-700 flex items-center gap-2"><Smartphone className="w-4 h-4"/>Mobile Money</p>
-                  <select value={payForm.provider} onChange={e=>setPayForm(f=>({...f,provider:e.target.value}))}
-                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
-                    <option value="">— Choisir un opérateur —</option>
-                    {MOBILE_OPERATORS.map(op=><option key={op} value={op}>{op}</option>)}
-                  </select>
-                  <input placeholder="Numéro de téléphone *" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
-                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"/>
+              {/* ══════ ÉTAPE 2 : Détails & confirmation ══════ */}
+              {payStep === 2 && (
+                <div className="space-y-4">
+
+                  {/* Récap méthode choisie */}
+                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+                    {(() => {
+                      const method = PAYMENT_METHODS.find(m=>m.value===payForm.paymentMethod);
+                      const op = MOBILE_OPERATORS.find(o=>o.id===selectedOperator);
+                      const Icon = method?.icon || Smartphone;
+                      return <>
+                        <div className={`w-10 h-10 ${op?op.color:'bg-green-500'} rounded-xl flex items-center justify-center shadow-sm shrink-0`}>
+                          {op ? <span className="text-xl">{op.emoji}</span> : <Icon className="w-5 h-5 text-white"/>}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{op?.label || method?.label}</p>
+                          <p className="text-xs text-gray-500">{op?.country || 'Méthode sélectionnée'}</p>
+                        </div>
+                        <button type="button" onClick={()=>setPayStep(1)} className="ml-auto text-xs text-green-600 hover:underline font-medium">Changer</button>
+                      </>;
+                    })()}
+                  </div>
+
+                  {/* Montant + devise + période */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Montant *</label>
+                      <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="0"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Devise</label>
+                      <select value={payForm.currency} onChange={e=>setPayForm(f=>({...f,currency:e.target.value}))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
+                        {['XOF','EUR','USD','GHS','XAF'].map(c=><option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Période</label>
+                      <input type="text" value={payForm.period} onChange={e=>setPayForm(f=>({...f,period:e.target.value}))}
+                        placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Nb consultations</label>
+                      <input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
+                    </div>
+                  </div>
+
+                  {/* Champs spécifiques mobile money */}
+                  {payForm.paymentMethod === 'mobile_money' && (
+                    <div className="space-y-2 p-4 bg-green-50 rounded-xl border border-green-200">
+                      <p className="text-xs font-bold text-green-700 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
+                      <input placeholder="Numéro de téléphone *" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
+                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+                        type="tel"/>
+                      <input placeholder="Référence de la transaction (optionnel)" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"/>
+                    </div>
+                  )}
+
+                  {/* Champs spécifiques virement */}
+                  {payForm.paymentMethod === 'bank_transfer' && (
+                    <div className="space-y-2 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
+                      {[{pl:'Nom de la banque *',k:'bankName'},{pl:'Numéro de compte *',k:'accountNumber'},{pl:'IBAN (optionnel)',k:'iban'}].map(({pl,k})=>(
+                        <input key={k} placeholder={pl} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
+                          className="w-full px-3 py-2.5 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Espèces / Chèque */}
+                  {(payForm.paymentMethod==='cash'||payForm.paymentMethod==='check') && (
+                    <div className="space-y-2 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                      <p className="text-xs font-bold text-yellow-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Banknote className="w-3.5 h-3.5"/>{payForm.paymentMethod==='cash'?'Paiement espèces':'Paiement par chèque'}
+                      </p>
+                      <input placeholder="Numéro de référence / reçu" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                        className="w-full px-3 py-2.5 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"/>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optionnel)</label>
+                    <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
+                      placeholder="Observations, justificatifs…"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"/>
+                  </div>
+
+                  {/* Boutons */}
+                  <div className="flex gap-3 pt-1">
+                    <button type="button" onClick={()=>setPayStep(1)}
+                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm flex items-center justify-center gap-1">
+                      ← Retour
+                    </button>
+                    <button type="button" onClick={submitPayment} disabled={payLoading || !payForm.amount || parseFloat(payForm.amount)<=0}
+                      className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 text-sm">
+                      {payLoading
+                        ? <Loader2 className="w-5 h-5 animate-spin"/>
+                        : <><Send className="w-4 h-4"/> Confirmer le paiement</>
+                      }
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {(payForm.paymentMethod === 'cash' || payForm.paymentMethod === 'check') && (
-                <div className="space-y-2 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-                  <p className="text-sm font-semibold text-yellow-700 flex items-center gap-2">
-                    <Banknote className="w-4 h-4"/>{payForm.paymentMethod === 'cash' ? 'Paiement en espèces' : 'Paiement par chèque'}
-                  </p>
-                  <input placeholder="Numéro de référence / reçu" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                    className="w-full px-3 py-2 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"/>
-                </div>
-              )}
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Notes (optionnel)</label>
-                <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
-                  placeholder="Observations, justificatifs…"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"/>
-              </div>
-
-              {/* Boutons */}
-              <div className="flex gap-3 pt-2">
-                <button onClick={()=>setShowPayModal(false)} className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm">Annuler</button>
-                <button onClick={submitPayment} disabled={payLoading}
-                  className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 text-sm">
-                  {payLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : <><Send className="w-4 h-4"/>Confirmer le paiement</>}
-                </button>
-              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══════════════ MODAL PRESCRIPTION ═════════════════════════════════ */}
+
+      {/* ══════════════ MODAL PRESCRIPTION ══════════════════════════════════ */}
       {selectedPresc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={()=>setSelectedPresc(null)}>
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-teal-50">
-              <div><h2 className="text-xl font-bold text-gray-900">Détail ordonnance</h2><p className="text-sm text-gray-500">Émise le {fmtDate(selectedPresc.createdAt)}</p></div>
+              <div><h2 className="text-xl font-bold text-gray-900">Détail de l'ordonnance</h2><p className="text-sm text-gray-500">Émise le {fmtDate(selectedPresc.createdAt)}</p></div>
               <button onClick={()=>setSelectedPresc(null)} className="p-2 hover:bg-gray-100 rounded-xl transition"><X className="w-5 h-5 text-gray-500"/></button>
             </div>
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-blue-50 rounded-xl border border-blue-200"><p className="text-xs text-blue-500 font-bold mb-1 uppercase">Médecin</p><p className="font-semibold text-gray-900">Dr. {selectedPresc.doctor?.firstName} {selectedPresc.doctor?.lastName}</p><p className="text-sm text-gray-500">{selectedPresc.doctor?.specialty}</p></div>
-                <div className="p-3 bg-purple-50 rounded-xl border border-purple-200"><p className="text-xs text-purple-500 font-bold mb-1 uppercase">Patient</p><p className="font-semibold text-gray-900">{selectedPresc.patient?.firstName} {selectedPresc.patient?.lastName}</p><p className="text-sm text-gray-500">{selectedPresc.patient?.email}</p></div>
+                <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
+                  <p className="text-xs text-blue-500 font-bold mb-1 uppercase tracking-wider">Médecin</p>
+                  <p className="font-semibold text-gray-900">Dr. {selectedPresc.doctor?.firstName} {selectedPresc.doctor?.lastName}</p>
+                  <p className="text-sm text-gray-500">{selectedPresc.doctor?.specialty}</p>
+                  <p className="text-xs text-gray-400">{selectedPresc.doctor?.email}</p>
+                </div>
+                <div className="p-3 bg-purple-50 rounded-xl border border-purple-200">
+                  <p className="text-xs text-purple-500 font-bold mb-1 uppercase tracking-wider">Patient</p>
+                  <p className="font-semibold text-gray-900">{selectedPresc.patient?.firstName} {selectedPresc.patient?.lastName}</p>
+                  <p className="text-sm text-gray-500">{selectedPresc.patient?.email}</p>
+                  <p className="text-xs text-gray-400">{selectedPresc.patient?.phoneNumber}</p>
+                </div>
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Médicaments</p>
@@ -1060,10 +1223,18 @@ const AdminDashboard: React.FC = () => {
                   ))}
                 </div>
               </div>
-              {selectedPresc.notes && <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl"><p className="text-xs text-yellow-600 font-bold mb-1 uppercase">Recommandations</p><p className="text-sm text-gray-700">{selectedPresc.notes}</p></div>}
+              {selectedPresc.notes && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+                  <p className="text-xs text-yellow-600 font-bold mb-1 uppercase tracking-wider">Recommandations</p>
+                  <p className="text-sm text-gray-700">{selectedPresc.notes}</p>
+                </div>
+              )}
               <div className="flex items-center gap-3 flex-wrap pt-2 border-t border-gray-100">
                 <Badge status={selectedPresc.status}/>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedPresc.isRead?'bg-green-50 text-green-700 border-green-200':'bg-orange-50 text-orange-600 border-orange-200'}`}>{selectedPresc.isRead?'✓ Lu':'● Non lu'}</span>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${selectedPresc.isRead?'bg-green-50 text-green-700 border-green-200':'bg-orange-50 text-orange-600 border-orange-200 font-bold'}`}>
+                  {selectedPresc.isRead ? '✓ Lu' : '● Non lu'}
+                </span>
+                {selectedPresc.validUntil && <span className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">Valide jusqu'au {fmtDate(selectedPresc.validUntil)}</span>}
               </div>
             </div>
           </div>
