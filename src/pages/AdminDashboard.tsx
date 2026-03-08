@@ -7,12 +7,12 @@ import {
   Smartphone, Building2, Receipt, RefreshCw, X, Send,
   Loader2, WifiOff, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { useNotification } from '../../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import { adminService, DashboardStats } from '../../services/adminService';
-import { calendarService } from '../../services/calendarService';
-import UserManagement from '../../components/Admin/UserManagement';
+import { adminService, DashboardStats } from '../services/adminService';
+import { calendarService } from '../services/calendarService';
+import UserManagement from '../components/Admin/UserManagement';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CalendarItem {
