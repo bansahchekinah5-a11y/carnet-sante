@@ -32,6 +32,12 @@ interface AdminVideoCall {
   doctor?:  { id: string; firstName: string; lastName: string; specialty?: string };
   patient?: { id: string; firstName: string; lastName: string; phoneNumber?: string };
 }
+interface AdminAppointment {
+  id: string; appointmentDate: string; status: string; type: string;
+  reason?: string; duration?: number; notes?: string;
+  doctor?:  { id: string; firstName: string; lastName: string; specialty?: string };
+  patient?: { id: string; firstName: string; lastName: string; email?: string; phoneNumber?: string };
+}
 interface DoctorEarning {
   doctor: { id: string; firstName: string; lastName: string; email: string; specialty: string; phoneNumber?: string; consultationPrice?: number };
   stats:  { completedConsultations: number; paidConsultations: number; unpaidConsultations: number; totalEarned: number; doctorShare: number; totalPaid: number; amountDue: number };
@@ -163,6 +169,7 @@ const AdminDashboard: React.FC = () => {
     recentActivities: []
   });
   const [calendars, setCalendars]         = useState<CalendarItem[]>([]);
+  const [appointments, setAppointments]   = useState<AdminAppointment[]>([]);
   const [prescriptions, setPrescriptions] = useState<AdminPrescription[]>([]);
   const [videoCalls, setVideoCalls]       = useState<AdminVideoCall[]>([]);
   const [earnings, setEarnings]           = useState<DoctorEarning[]>([]);
@@ -174,6 +181,8 @@ const AdminDashboard: React.FC = () => {
   const [tabError, setTabError]         = useState<string | null>(null);
 
   // ── Filtres ──
+  const [apptFilter,  setApptFilter]  = useState('');
+  const [apptStatus,  setApptStatus]  = useState('');
   const [prescFilter, setPrescFilter] = useState('');
   const [videoFilter, setVideoFilter] = useState('');
   const [payFilter, setPayFilter]     = useState('');
@@ -217,6 +226,15 @@ const AdminDashboard: React.FC = () => {
     setTabLoading(true);
     setTabError(null);
     try {
+      if (tab === 'appointments') {
+        try {
+          const r = await apiCall('/admin/appointments?limit=500');
+          setAppointments(Array.isArray(r.data) ? r.data : (Array.isArray(r.appointments) ? r.appointments : []));
+        } catch {
+          const r = await apiCall('/appointments?limit=500');
+          setAppointments(Array.isArray(r.data) ? r.data : (Array.isArray(r.appointments) ? r.appointments : []));
+        }
+      }
       if (tab === 'prescriptions') {
         const r = await apiCall('/admin/prescriptions?limit=200');
         setPrescriptions(Array.isArray(r.data) ? r.data : []);
@@ -243,7 +261,7 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (['prescriptions','videocalls','payments'].includes(activeTab)) {
+    if (['appointments','prescriptions','videocalls','payments'].includes(activeTab)) {
       fetchTab(activeTab);
     }
   }, [activeTab, fetchTab]);
@@ -312,6 +330,15 @@ const AdminDashboard: React.FC = () => {
   };
 
   // ── Données filtrées ──────────────────────────────────────────────────────
+  const APPT_STATUS_LABELS: Record<string,string> = {
+    pending:'En attente', confirmed:'Confirmé', completed:'Terminé', cancelled:'Annulé', no_show:'Absent'
+  };
+  const fAppts = (appointments || []).filter(a => {
+    const q = apptFilter.toLowerCase();
+    const matchQ = !q || (`${a.doctor?.firstName||''} ${a.doctor?.lastName||''} ${a.patient?.firstName||''} ${a.patient?.lastName||''}`).toLowerCase().includes(q);
+    const matchS = !apptStatus || a.status === apptStatus;
+    return matchQ && matchS;
+  });
   const fPresc  = (prescriptions || []).filter(p => { const q = prescFilter.toLowerCase(); return !q || `${p.doctor?.firstName||''} ${p.doctor?.lastName||''} ${p.patient?.firstName||''} ${p.patient?.lastName||''}`.toLowerCase().includes(q); });
   const fVideos = (videoCalls || []).filter(v => { const q = videoFilter.toLowerCase(); return !q || `${v.doctor?.firstName||''} ${v.doctor?.lastName||''} ${v.patient?.firstName||''} ${v.patient?.lastName||''}`.toLowerCase().includes(q); });
   const fEarn   = (earnings || []).filter(e => { const q = payFilter.toLowerCase(); return !q || `${e.doctor.firstName} ${e.doctor.lastName} ${e.doctor.specialty||''}`.toLowerCase().includes(q); });
@@ -556,9 +583,115 @@ const AdminDashboard: React.FC = () => {
 
         {/* ══ RENDEZ-VOUS ═══════════════════════════════════════════════════ */}
         {activeTab === 'appointments' && (
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><Calendar className="w-6 h-6 text-orange-500"/>Gestion des rendez-vous</h2>
-            <p className="text-gray-400">En cours de développement…</p>
+          <div className="space-y-5">
+            {/* En-tête */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl shadow-md"><Calendar className="w-5 h-5 text-white"/></div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Tous les rendez-vous</h2>
+                  <p className="text-sm text-gray-500">{appointments.length} au total</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <select value={apptStatus} onChange={e=>setApptStatus(e.target.value)}
+                  className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+                  <option value="">Tous les statuts</option>
+                  {Object.entries(APPT_STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                </select>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                  <input type="text" placeholder="Médecin ou patient…" value={apptFilter} onChange={e=>setApptFilter(e.target.value)}
+                    className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 w-56 bg-white"/>
+                </div>
+                <button onClick={()=>fetchTab('appointments')} className="p-2.5 bg-orange-50 border border-orange-200 text-orange-600 rounded-xl hover:bg-orange-100 transition">
+                  <RefreshCw className="w-4 h-4"/>
+                </button>
+              </div>
+            </div>
+            {/* Mini-stats */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                {l:'Total',      v:appointments.length,                                  c:'from-gray-400 to-gray-500'},
+                {l:'En attente', v:appointments.filter(a=>a.status==='pending').length,   c:'from-yellow-500 to-amber-600'},
+                {l:'Confirmés',  v:appointments.filter(a=>a.status==='confirmed').length, c:'from-green-500 to-emerald-600'},
+                {l:'Terminés',   v:appointments.filter(a=>a.status==='completed').length, c:'from-blue-500 to-indigo-600'},
+                {l:'Annulés',    v:appointments.filter(a=>a.status==='cancelled').length, c:'from-red-500 to-rose-600'},
+              ].map(({l,v,c})=>(
+                <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><Calendar className="w-5 h-5 text-white"/></div>
+                  <div><p className="text-xs text-gray-500">{l}</p><p className="text-2xl font-bold text-gray-900">{v}</p></div>
+                </div>
+              ))}
+            </div>
+            {tabLoading ? <Spinner label="Chargement des rendez-vous…"/> :
+              tabError ? <ApiError error={tabError} retry={()=>fetchTab('appointments')}/> :
+              fAppts.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                  <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3"/>
+                  <p className="text-gray-500 font-medium">Aucun rendez-vous trouvé</p>
+                  <p className="text-xs text-gray-400 mt-1">{appointments.length===0?'Les rendez-vous apparaîtront ici dès qu'un patient prendra rendez-vous':'Aucun résultat pour ce filtre'}</p>
+                </div>
+              ) : (
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
+                <table className="w-full min-w-[750px]">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>{['Date & Heure','Médecin','Patient','Type','Motif','Durée','Statut'].map(h=>(
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {fAppts.map(a => {
+                      const dt = a.appointmentDate ? new Date(a.appointmentDate) : null;
+                      const dateStr = dt ? dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+                      const timeStr = dt ? dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '—';
+                      const typeLabels: Record<string,string> = {in_person:'Présentiel',teleconsultation:'Téléconsult.',home_visit:'Domicile'};
+                      const statusStyle: Record<string,string> = {
+                        pending:'bg-yellow-100 text-yellow-700 border-yellow-200',
+                        confirmed:'bg-green-100 text-green-700 border-green-200',
+                        completed:'bg-blue-100 text-blue-700 border-blue-200',
+                        cancelled:'bg-red-100 text-red-700 border-red-200',
+                        no_show:'bg-gray-100 text-gray-600 border-gray-200',
+                      };
+                      const statusLabel: Record<string,string> = {pending:'En attente',confirmed:'Confirmé',completed:'Terminé',cancelled:'Annulé',no_show:'Absent'};
+                      return (
+                        <tr key={a.id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <p className="text-sm font-semibold text-gray-900">{dateStr}</p>
+                            <p className="text-xs text-gray-500 flex items-center gap-1"><Clock className="w-3 h-3"/>{timeStr}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-medium text-gray-900">Dr. {a.doctor?.firstName} {a.doctor?.lastName}</p>
+                            <p className="text-xs text-gray-500">{a.doctor?.specialty}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-medium text-gray-900">{a.patient?.firstName} {a.patient?.lastName}</p>
+                            <p className="text-xs text-gray-400">{a.patient?.email}</p>
+                            <p className="text-xs text-gray-400">{a.patient?.phoneNumber}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-full text-xs font-medium">
+                              {typeLabels[a.type] || a.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 max-w-[160px]">
+                            <p className="text-sm text-gray-700 truncate" title={a.reason||'—'}>{a.reason||'—'}</p>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                            {a.duration ? `${a.duration} min` : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyle[a.status]||statusStyle.pending}`}>
+                              {statusLabel[a.status]||a.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
