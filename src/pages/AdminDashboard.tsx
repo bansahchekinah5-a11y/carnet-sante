@@ -5,7 +5,7 @@ import {
   UserCheck, Clock, CheckCircle, XCircle, DollarSign,
   FileText, Award, AlertCircle, Video, Pill, Banknote,
   Smartphone, Building2, Receipt, RefreshCw, X, Send,
-  Loader2, WifiOff
+  Loader2, WifiOff, Phone, Mail
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -19,6 +19,12 @@ interface CalendarItem {
   id: string; date: string; slots: string[]; confirmed: boolean;
   doctor?: { firstName: string; lastName: string; id: string };
 }
+interface AdminAppointment {
+  id: string; appointmentDate: string; status: string; type: string;
+  reason?: string; duration?: number; notes?: string;
+  doctor?:  { id: string; firstName: string; lastName: string; specialty?: string };
+  patient?: { id: string; firstName: string; lastName: string; email?: string; phoneNumber?: string };
+}
 interface AdminPrescription {
   id: string; createdAt: string; status: string; isRead: boolean;
   medications: { medication: string; dosage: string; frequency: string; duration: string; instructions?: string }[];
@@ -29,7 +35,7 @@ interface AdminPrescription {
 interface AdminVideoCall {
   id: string; createdAt: string; status: string;
   roomLink?: string; meetingUrl?: string;
-  durationMinutes?: number; duration?: number; notes?: string;
+  durationMinutes?: number; duration?: number;
   doctor?:  { id: string; firstName: string; lastName: string; specialty?: string };
   patient?: { id: string; firstName: string; lastName: string; phoneNumber?: string };
 }
@@ -49,7 +55,7 @@ interface DoctorPaymentRecord {
 type Tab = 'dashboard' | 'doctors' | 'patients' | 'appointments'
          | 'prescriptions' | 'videocalls' | 'payments' | 'financial' | 'calendars';
 
-// ─── Config paiements ─────────────────────────────────────────────────────────
+// ─── Config ───────────────────────────────────────────────────────────────────
 const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Virement bancaire', icon: Building2,  color: 'text-blue-600'   },
   { value: 'mobile_money',  label: 'Mobile Money',      icon: Smartphone, color: 'text-green-600'  },
@@ -57,6 +63,14 @@ const PAYMENT_METHODS = [
   { value: 'check',         label: 'Chèque',            icon: Receipt,    color: 'text-purple-600' },
 ];
 const MOBILE_OPERATORS = ['Orange Money','MTN Mobile Money','Moov Money','Wave','Free Money','T-Money'];
+
+const APPT_STATUS_LABELS: Record<string,string> = {
+  pending:'En attente', confirmed:'Confirmé', completed:'Terminé',
+  cancelled:'Annulé', no_show:'Absent'
+};
+const APPT_TYPE_LABELS: Record<string,string> = {
+  in_person:'Présentiel', teleconsultation:'Téléconsultation', home_visit:'Domicile'
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d?: string) => {
@@ -76,25 +90,30 @@ const fmtDT = (d?: string) => {
 };
 
 const STATUS_STYLE: Record<string,string> = {
-  active:     'bg-green-100 text-green-700 border-green-200',
-  completed:  'bg-blue-100 text-blue-700 border-blue-200',
-  cancelled:  'bg-red-100 text-red-700 border-red-200',
-  pending:    'bg-yellow-100 text-yellow-700 border-yellow-200',
-  scheduled:  'bg-indigo-100 text-indigo-700 border-indigo-200',
-  ongoing:    'bg-cyan-100 text-cyan-700 border-cyan-200',
-  missed:     'bg-gray-100 text-gray-600 border-gray-200',
-  failed:     'bg-red-100 text-red-700 border-red-200',
-  processing: 'bg-orange-100 text-orange-700 border-orange-200',
-  filled:     'bg-teal-100 text-teal-700 border-teal-200',
-  expired:    'bg-gray-100 text-gray-500 border-gray-200',
+  active:       'bg-green-100 text-green-700 border-green-200',
+  completed:    'bg-blue-100 text-blue-700 border-blue-200',
+  cancelled:    'bg-red-100 text-red-700 border-red-200',
+  pending:      'bg-yellow-100 text-yellow-700 border-yellow-200',
+  confirmed:    'bg-green-100 text-green-700 border-green-200',
+  scheduled:    'bg-indigo-100 text-indigo-700 border-indigo-200',
+  no_show:      'bg-gray-100 text-gray-600 border-gray-200',
+  missed:       'bg-gray-100 text-gray-600 border-gray-200',
+  failed:       'bg-red-100 text-red-700 border-red-200',
+  processing:   'bg-orange-100 text-orange-700 border-orange-200',
+  filled:       'bg-teal-100 text-teal-700 border-teal-200',
+  expired:      'bg-gray-100 text-gray-500 border-gray-200',
+  in_person:    'bg-blue-50 text-blue-600 border-blue-200',
+  teleconsultation:'bg-purple-50 text-purple-600 border-purple-200',
+  home_visit:   'bg-orange-50 text-orange-600 border-orange-200',
 };
 const STATUS_LABEL: Record<string,string> = {
   active:'Actif', completed:'Terminé', cancelled:'Annulé', pending:'En attente',
-  scheduled:'Planifié', ongoing:'En cours', missed:'Manqué', failed:'Échoué',
-  processing:'En traitement', filled:'Délivré', expired:'Expiré',
+  confirmed:'Confirmé', scheduled:'Planifié', no_show:'Absent', missed:'Manqué',
+  failed:'Échoué', processing:'En traitement', filled:'Délivré', expired:'Expiré',
+  in_person:'Présentiel', teleconsultation:'Téléconsultation', home_visit:'Domicile',
 };
 
-// ─── Appel API (lit le token JWT depuis localStorage/sessionStorage) ──────────
+// ─── Appel API natif (lit le token JWT) ───────────────────────────────────────
 const apiCall = async (path: string, options: RequestInit = {}): Promise<any> => {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const BASE  = (import.meta as any).env?.VITE_API_URL || 'https://carnet-sante-backend.onrender.com/api';
@@ -117,14 +136,12 @@ const Badge = ({ status }: { status: string }) => (
     {STATUS_LABEL[status] || status}
   </span>
 );
-
 const Spinner = ({ label = 'Chargement…' }: { label?: string }) => (
   <div className="flex items-center justify-center py-20 gap-3">
     <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
     <span className="text-gray-500 font-medium">{label}</span>
   </div>
 );
-
 const EmptyState = ({ icon: Icon, label, sub }: { icon: any; label: string; sub?: string }) => (
   <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
     <Icon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -132,7 +149,6 @@ const EmptyState = ({ icon: Icon, label, sub }: { icon: any; label: string; sub?
     {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
   </div>
 );
-
 const ApiError = ({ error, retry }: { error: string; retry: () => void }) => (
   <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center gap-3">
     <WifiOff className="w-10 h-10 text-red-400" />
@@ -144,8 +160,6 @@ const ApiError = ({ error, retry }: { error: string; retry: () => void }) => (
   </div>
 );
 
-// ══════════════════════════════════════════════════════════════════════════════
-// COMPOSANT PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════════
 const AdminDashboard: React.FC = () => {
   const { user, logout }     = useAuth();
@@ -162,17 +176,20 @@ const AdminDashboard: React.FC = () => {
     recentActivities: []
   });
   const [calendars, setCalendars]         = useState<CalendarItem[]>([]);
+  const [appointments, setAppointments]   = useState<AdminAppointment[]>([]);
   const [prescriptions, setPrescriptions] = useState<AdminPrescription[]>([]);
   const [videoCalls, setVideoCalls]       = useState<AdminVideoCall[]>([]);
   const [earnings, setEarnings]           = useState<DoctorEarning[]>([]);
   const [payments, setPayments]           = useState<DoctorPaymentRecord[]>([]);
 
-  // ── États chargement ──────────────────────────────────────────────────────
-  const [dashLoading, setDashLoading] = useState(true);
-  const [tabLoading, setTabLoading]   = useState(false);
-  const [tabError, setTabError]       = useState<string | null>(null);
+  // ── Loading / erreur ──────────────────────────────────────────────────────
+  const [dashLoading, setDashLoading]   = useState(true);
+  const [tabLoading, setTabLoading]     = useState(false);
+  const [tabError,   setTabError]       = useState<string | null>(null);
 
   // ── Filtres ───────────────────────────────────────────────────────────────
+  const [apptFilter,  setApptFilter]  = useState('');
+  const [apptStatus,  setApptStatus]  = useState('');
   const [prescFilter, setPrescFilter] = useState('');
   const [videoFilter, setVideoFilter] = useState('');
   const [payFilter,   setPayFilter]   = useState('');
@@ -200,11 +217,8 @@ const AdminDashboard: React.FC = () => {
       ]);
       if (sRes.status === 'fulfilled' && sRes.value?.success) setStats(sRes.value.data);
       if (cRes.status === 'fulfilled') setCalendars(cRes.value?.data || []);
-    } catch (e) {
-      console.error('fetchDashboard:', e);
-    } finally {
-      setDashLoading(false);
-    }
+    } catch (e) { console.error('fetchDashboard:', e); }
+    finally { setDashLoading(false); }
   }, []);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
@@ -214,6 +228,16 @@ const AdminDashboard: React.FC = () => {
     setTabLoading(true);
     setTabError(null);
     try {
+      if (tab === 'appointments') {
+        // Essaie d'abord la route admin, sinon la route standard
+        try {
+          const r = await apiCall('/admin/appointments?limit=500');
+          setAppointments(Array.isArray(r.data) ? r.data : (Array.isArray(r.appointments) ? r.appointments : []));
+        } catch {
+          const r = await apiCall('/appointments?limit=500');
+          setAppointments(Array.isArray(r.data) ? r.data : (Array.isArray(r.appointments) ? r.appointments : []));
+        }
+      }
       if (tab === 'prescriptions') {
         const r = await apiCall('/admin/prescriptions?limit=200');
         setPrescriptions(Array.isArray(r.data) ? r.data : []);
@@ -231,16 +255,12 @@ const AdminDashboard: React.FC = () => {
         setPayments(Array.isArray(pR.data) ? pR.data : []);
       }
     } catch (e: any) {
-      const msg = e?.message || 'Erreur inconnue';
-      console.error(`fetchTab(${tab}):`, msg);
-      setTabError(msg);
-    } finally {
-      setTabLoading(false);
-    }
+      setTabError(e?.message || 'Erreur inconnue');
+    } finally { setTabLoading(false); }
   }, []);
 
   useEffect(() => {
-    if (['prescriptions', 'videocalls', 'payments'].includes(activeTab)) {
+    if (['appointments','prescriptions','videocalls','payments'].includes(activeTab)) {
       fetchTab(activeTab);
     }
   }, [activeTab, fetchTab]);
@@ -262,7 +282,9 @@ const AdminDashboard: React.FC = () => {
       amount: e.stats.amountDue.toString(),
       consultationsCount: e.stats.unpaidConsultations.toString(),
       period: new Date().toLocaleDateString('fr-FR', { month:'long', year:'numeric' }),
-      phoneNumber: e.doctor.phoneNumber || ''
+      phoneNumber: e.doctor.phoneNumber || '',
+      // Reset détails
+      bankName:'', accountNumber:'', iban:'', provider:'', reference:''
     }));
     setShowPayModal(true);
   };
@@ -306,7 +328,13 @@ const AdminDashboard: React.FC = () => {
     if (window.confirm('Vous déconnecter ?')) { logout(); navigate('/login'); }
   };
 
-  // ── Données filtrées ──────────────────────────────────────────────────────
+  // ── Filtres calculés ──────────────────────────────────────────────────────
+  const fAppts = appointments.filter(a => {
+    const q = apptFilter.toLowerCase();
+    const matchQ = !q || `${a.doctor?.firstName||''} ${a.doctor?.lastName||''} ${a.patient?.firstName||''} ${a.patient?.lastName||''}`.toLowerCase().includes(q);
+    const matchS = !apptStatus || a.status === apptStatus;
+    return matchQ && matchS;
+  });
   const fPresc  = prescriptions.filter(p => { const q = prescFilter.toLowerCase(); return !q || `${p.doctor?.firstName||''} ${p.doctor?.lastName||''} ${p.patient?.firstName||''} ${p.patient?.lastName||''}`.toLowerCase().includes(q); });
   const fVideos = videoCalls.filter(v => { const q = videoFilter.toLowerCase(); return !q || `${v.doctor?.firstName||''} ${v.doctor?.lastName||''} ${v.patient?.firstName||''} ${v.patient?.lastName||''}`.toLowerCase().includes(q); });
   const fEarn   = earnings.filter(e => { const q = payFilter.toLowerCase(); return !q || `${e.doctor.firstName} ${e.doctor.lastName} ${e.doctor.specialty||''}`.toLowerCase().includes(q); });
@@ -363,18 +391,13 @@ const AdminDashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-1 overflow-x-auto py-2">
             {NAV.map(tab => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
+              const Icon = tab.icon; const active = activeTab === tab.id;
               return (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`shrink-0 py-2.5 px-4 rounded-lg font-medium text-sm flex items-center gap-2 transition-all ${
-                    active ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                  }`}>
+                  className={`shrink-0 py-2.5 px-4 rounded-lg font-medium text-sm flex items-center gap-2 transition-all ${active ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>
                   <Icon className="w-4 h-4" />
                   {tab.label}
-                  {tab.badge && tab.badge > 0
-                    ? <span className="ml-0.5 px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full font-bold leading-none">{tab.badge}</span>
-                    : null}
+                  {tab.badge && tab.badge > 0 ? <span className="ml-0.5 px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full font-bold leading-none">{tab.badge}</span> : null}
                 </button>
               );
             })}
@@ -385,15 +408,14 @@ const AdminDashboard: React.FC = () => {
       {/* ── CONTENU ─────────────────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        {/* ══ TABLEAU DE BORD ══════════════════════════════════════════════ */}
+        {/* ══ TABLEAU DE BORD ══ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             {dashLoading ? <Spinner /> : (
               <>
-                {/* Stat cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                   {[
-                    { title:'Utilisateurs totaux', value:stats.users.total, icon:Users, color:'from-blue-500 to-indigo-600',
+                    { title:'Utilisateurs', value:stats.users.total, icon:Users, color:'from-blue-500 to-indigo-600',
                       rows:[{l:'Médecins',v:stats.users.doctors},{l:'Patients',v:stats.users.patients},{l:'Admins',v:stats.users.admins},{l:'Actifs',v:stats.users.active},{l:'Inactifs',v:stats.users.inactive}] },
                     { title:'Rendez-vous', value:stats.appointments.total, icon:Calendar, color:'from-orange-500 to-rose-500',
                       rows:[{l:'En attente',v:stats.appointments.pending},{l:'Confirmés',v:stats.appointments.confirmed},{l:'Terminés',v:stats.appointments.completed},{l:'Annulés',v:stats.appointments.cancelled},{l:"Aujourd'hui",v:stats.appointments.today}] },
@@ -411,75 +433,57 @@ const AdminDashboard: React.FC = () => {
                         </div>
                         <h3 className="text-base font-semibold text-gray-900 mb-3">{c.title}</h3>
                         <div className="space-y-1.5">
-                          {c.rows.map((r, j) => (
-                            <div key={j} className="flex justify-between text-sm px-2 py-1.5 bg-gray-50 rounded-lg">
-                              <span className="text-gray-600">{r.l}</span>
-                              <span className="font-semibold text-gray-900">{r.v}</span>
-                            </div>
-                          ))}
+                          {c.rows.map((r,j) => <div key={j} className="flex justify-between text-sm px-2 py-1.5 bg-gray-50 rounded-lg"><span className="text-gray-600">{r.l}</span><span className="font-semibold text-gray-900">{r.v}</span></div>)}
                         </div>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Activités + Calendriers */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100">
-                      <Activity className="w-5 h-5 text-blue-600"/> Activité récente
-                    </h3>
+                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100"><Activity className="w-5 h-5 text-blue-600"/>Activité récente</h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto">
                       {(stats.recentActivities || []).length === 0 ? (
                         <div className="text-center py-10"><Activity className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucune activité récente</p></div>
                       ) : stats.recentActivities.map(a => {
-                        const {date, time} = fmtDT(a.timestamp);
+                        const {date,time} = fmtDT(a.timestamp);
                         return (
                           <div key={a.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
                             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shrink-0"><Activity className="w-4 h-4 text-white"/></div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{a.description}</p>
-                              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{date} {time}</span>
-                                <Badge status={a.status || 'completed'} />
-                              </div>
+                              <div className="flex items-center gap-2 mt-1"><span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{date} {time}</span><Badge status={a.status||'completed'}/></div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
-
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100">
-                      <Calendar className="w-5 h-5 text-purple-600"/> Derniers calendriers
-                    </h3>
+                    <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100"><Calendar className="w-5 h-5 text-purple-600"/>Derniers calendriers</h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto">
-                      {calendars.length === 0 ? (
-                        <div className="text-center py-10"><Calendar className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucun calendrier</p></div>
-                      ) : calendars.slice(0, 6).map(cal => (
-                        <div key={cal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-purple-200 transition">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm">{fmtDate(cal.date)}</p>
-                            <p className="text-xs text-gray-500">Dr. {cal.doctor?.firstName} {cal.doctor?.lastName}</p>
-                            <div className="flex gap-1 mt-1 flex-wrap">
-                              {(cal.slots || []).slice(0,3).map((s,i) => <span key={i} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{s}</span>)}
-                              {(cal.slots || []).length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">+{cal.slots.length-3}</span>}
+                      {calendars.length === 0 ? <div className="text-center py-10"><Calendar className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucun calendrier</p></div>
+                        : calendars.slice(0,6).map(cal => (
+                          <div key={cal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-purple-200 transition">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-900 text-sm">{fmtDate(cal.date)}</p>
+                              <p className="text-xs text-gray-500">Dr. {cal.doctor?.firstName} {cal.doctor?.lastName}</p>
+                              <div className="flex gap-1 mt-1 flex-wrap">
+                                {(cal.slots||[]).slice(0,3).map((s,i)=><span key={i} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{s}</span>)}
+                                {(cal.slots||[]).length > 3 && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">+{cal.slots.length-3}</span>}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-2 ml-3 shrink-0">
+                              <Badge status={cal.confirmed?'completed':'pending'}/>
+                              <button onClick={()=>handleDeleteCalendar(cal.id)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition border border-red-200"><Trash className="w-3.5 h-3.5"/></button>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-2 ml-3 shrink-0">
-                            <Badge status={cal.confirmed ? 'completed' : 'pending'} />
-                            <button onClick={() => handleDeleteCalendar(cal.id)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition border border-red-200">
-                              <Trash className="w-3.5 h-3.5"/>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Mini-panels stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-blue-600"/>Répartition</h3>
@@ -508,7 +512,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="space-y-3">
                       <div className="bg-green-50 border border-green-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Revenus totaux</p><p className="text-2xl font-bold text-green-600">{stats.financial.totalRevenue} €</p></div>
                       <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Commission (10%)</p><p className="text-xl font-bold text-purple-600">{stats.financial.totalCommission} €</p></div>
-                      <div className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg"><span className="text-sm text-gray-600">En attente</span><span className="font-semibold text-yellow-600 text-sm">{stats.financial.pendingPayments} €</span></div>
+                      <div className="flex justify-between p-2.5 bg-gray-50 rounded-lg"><span className="text-sm text-gray-600">En attente</span><span className="font-semibold text-yellow-600 text-sm">{stats.financial.pendingPayments} €</span></div>
                     </div>
                   </div>
                 </div>
@@ -520,34 +524,111 @@ const AdminDashboard: React.FC = () => {
         {/* ══ MÉDECINS ══ */}
         {activeTab === 'doctors' && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-md"><UserCheck className="w-6 h-6 text-white"/></div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Gestion des médecins</h2>
-            </div>
-            <UserManagement userType="doctor" />
+            <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-md"><UserCheck className="w-6 h-6 text-white"/></div><h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Gestion des médecins</h2></div>
+            <UserManagement userType="doctor"/>
           </div>
         )}
 
         {/* ══ PATIENTS ══ */}
         {activeTab === 'patients' && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-3 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl shadow-md"><Users className="w-6 h-6 text-white"/></div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Gestion des patients</h2>
-            </div>
-            <UserManagement userType="patient" />
+            <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl shadow-md"><Users className="w-6 h-6 text-white"/></div><h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Gestion des patients</h2></div>
+            <UserManagement userType="patient"/>
           </div>
         )}
 
-        {/* ══ RENDEZ-VOUS ══ */}
+        {/* ══ RENDEZ-VOUS ══════════════════════════════════════════════════ */}
         {activeTab === 'appointments' && (
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><Calendar className="w-6 h-6 text-orange-500"/>Gestion des rendez-vous</h2>
-            <p className="text-gray-400">En cours de développement…</p>
+          <div className="space-y-5">
+            {/* En-tête */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl shadow-md"><Calendar className="w-5 h-5 text-white"/></div>
+                <div><h2 className="text-xl font-bold text-gray-900">Tous les rendez-vous</h2><p className="text-sm text-gray-500">{appointments.length} au total</p></div>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Filtre statut */}
+                <select value={apptStatus} onChange={e=>setApptStatus(e.target.value)}
+                  className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+                  <option value="">Tous les statuts</option>
+                  {Object.entries(APPT_STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                </select>
+                {/* Recherche */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                  <input type="text" placeholder="Médecin ou patient…" value={apptFilter} onChange={e=>setApptFilter(e.target.value)}
+                    className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 w-56 bg-white"/>
+                </div>
+                <button onClick={()=>fetchTab('appointments')} className="p-2.5 bg-orange-50 border border-orange-200 text-orange-600 rounded-xl hover:bg-orange-100 transition">
+                  <RefreshCw className="w-4 h-4"/>
+                </button>
+              </div>
+            </div>
+
+            {/* Mini-stats */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                {l:'Total',      v:appointments.length,                                         c:'from-gray-400 to-gray-500'},
+                {l:'En attente', v:appointments.filter(a=>a.status==='pending').length,          c:'from-yellow-500 to-amber-600'},
+                {l:'Confirmés',  v:appointments.filter(a=>a.status==='confirmed').length,        c:'from-green-500 to-emerald-600'},
+                {l:'Terminés',   v:appointments.filter(a=>a.status==='completed').length,        c:'from-blue-500 to-indigo-600'},
+                {l:'Annulés',    v:appointments.filter(a=>a.status==='cancelled').length,        c:'from-red-500 to-rose-600'},
+              ].map(({l,v,c})=>(
+                <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><Calendar className="w-5 h-5 text-white"/></div>
+                  <div><p className="text-xs text-gray-500">{l}</p><p className="text-2xl font-bold text-gray-900">{v}</p></div>
+                </div>
+              ))}
+            </div>
+
+            {tabLoading ? <Spinner label="Chargement des rendez-vous…"/> :
+              tabError ? <ApiError error={tabError} retry={()=>fetchTab('appointments')}/> :
+              fAppts.length === 0 ? <EmptyState icon={Calendar} label="Aucun rendez-vous trouvé" sub="Les rendez-vous apparaîtront ici dès qu'un patient prendra rendez-vous"/> : (
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
+                <table className="w-full min-w-[750px]">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>{['Date & Heure','Médecin','Patient','Type','Motif','Statut'].map(h=>(
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {fAppts.map(a => {
+                      const {date, time} = fmtDT(a.appointmentDate);
+                      return (
+                        <tr key={a.id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <p className="text-sm font-semibold text-gray-900">{date}</p>
+                            <p className="text-xs text-gray-500 flex items-center gap-1"><Clock className="w-3 h-3"/>{time}{a.duration ? ` · ${a.duration} min` : ''}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-medium text-gray-900">Dr. {a.doctor?.firstName} {a.doctor?.lastName}</p>
+                            <p className="text-xs text-gray-500">{a.doctor?.specialty}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-medium text-gray-900">{a.patient?.firstName} {a.patient?.lastName}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {a.patient?.email    && <span className="text-xs text-gray-400 flex items-center gap-0.5"><Mail className="w-3 h-3"/>{a.patient.email}</span>}
+                              {a.patient?.phoneNumber && <span className="text-xs text-gray-400 flex items-center gap-0.5"><Phone className="w-3 h-3"/>{a.patient.phoneNumber}</span>}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge status={a.type}/>
+                          </td>
+                          <td className="px-4 py-3 max-w-[180px]">
+                            <p className="text-sm text-gray-700 truncate" title={a.reason||'—'}>{a.reason || '—'}</p>
+                          </td>
+                          <td className="px-4 py-3"><Badge status={a.status}/></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ══ ORDONNANCES ══════════════════════════════════════════════════ */}
+        {/* ══ ORDONNANCES ══ */}
         {activeTab === 'prescriptions' && (
           <div className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -557,55 +638,35 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                <input type="text" placeholder="Médecin ou patient…" value={prescFilter} onChange={e => setPrescFilter(e.target.value)}
+                <input type="text" placeholder="Médecin ou patient…" value={prescFilter} onChange={e=>setPrescFilter(e.target.value)}
                   className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-64 bg-white"/>
               </div>
             </div>
-            {/* Mini-stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                {l:'Total',     v:prescriptions.length,                              c:'from-gray-400 to-gray-500'},
-                {l:'Actives',   v:prescriptions.filter(p=>p.status==='active').length,c:'from-green-500 to-emerald-600'},
-                {l:'Non lues',  v:prescriptions.filter(p=>!p.isRead).length,          c:'from-orange-500 to-red-500'},
-                {l:'Terminées', v:prescriptions.filter(p=>['completed','filled'].includes(p.status)).length, c:'from-blue-500 to-indigo-600'},
-              ].map(({l,v,c})=>(
+              {[{l:'Total',v:prescriptions.length,c:'from-gray-400 to-gray-500'},{l:'Actives',v:prescriptions.filter(p=>p.status==='active').length,c:'from-green-500 to-emerald-600'},{l:'Non lues',v:prescriptions.filter(p=>!p.isRead).length,c:'from-orange-500 to-red-500'},{l:'Terminées',v:prescriptions.filter(p=>['completed','filled'].includes(p.status)).length,c:'from-blue-500 to-indigo-600'}].map(({l,v,c})=>(
                 <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
                   <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><FileText className="w-5 h-5 text-white"/></div>
                   <div><p className="text-xs text-gray-500">{l}</p><p className="text-2xl font-bold text-gray-900">{v}</p></div>
                 </div>
               ))}
             </div>
-
-            {tabLoading ? <Spinner/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('prescriptions')}/> :
-              fPresc.length === 0 ? <EmptyState icon={Pill} label="Aucune ordonnance trouvée" sub={prescriptions.length === 0 ? "Aucun médecin n'a encore créé d'ordonnance" : "Aucun résultat pour ce filtre"}/> : (
+            {tabLoading ? <Spinner/> : tabError ? <ApiError error={tabError} retry={()=>fetchTab('prescriptions')}/> :
+              fPresc.length === 0 ? <EmptyState icon={Pill} label="Aucune ordonnance" sub="Les ordonnances apparaîtront ici dès qu'un médecin en crée une"/> : (
               <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
                 <table className="w-full min-w-[700px]">
                   <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>{['Date','Médecin','Patient','Médicaments','Statut','Lu','Voir'].map(h=>(
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                    ))}</tr>
+                    <tr>{['Date','Médecin','Patient','Médicaments','Statut','Lu','Voir'].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {fPresc.map(p => (
-                      <tr key={p.id} className={`hover:bg-gray-50 transition ${!p.isRead ? 'bg-orange-50/40' : ''}`}>
+                    {fPresc.map(p=>(
+                      <tr key={p.id} className={`hover:bg-gray-50 transition ${!p.isRead?'bg-orange-50/40':''}`}>
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
                         <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p><p className="text-xs text-gray-500">{p.doctor?.specialty}</p></td>
                         <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{p.patient?.firstName} {p.patient?.lastName}</p><p className="text-xs text-gray-500">{p.patient?.email}</p></td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {(p.medications || []).slice(0,2).map((m,i)=><span key={i} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs">💊 {m.medication}</span>)}
-                            {(p.medications || []).length > 2 && <span className="text-xs text-gray-400">+{p.medications.length-2}</span>}
-                          </div>
-                        </td>
+                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{(p.medications||[]).slice(0,2).map((m,i)=><span key={i} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs">💊 {m.medication}</span>)}{(p.medications||[]).length>2&&<span className="text-xs text-gray-400">+{p.medications.length-2}</span>}</div></td>
                         <td className="px-4 py-3"><Badge status={p.status}/></td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${p.isRead ? 'bg-green-50 text-green-600 border-green-200' : 'bg-orange-50 text-orange-600 border-orange-200 animate-pulse'}`}>
-                            {p.isRead ? '✓ Lu' : '● Non lu'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button onClick={()=>setSelectedPresc(p)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition border border-blue-200"><Eye className="w-4 h-4"/></button>
-                        </td>
+                        <td className="px-4 py-3"><span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${p.isRead?'bg-green-50 text-green-600 border-green-200':'bg-orange-50 text-orange-600 border-orange-200'}`}>{p.isRead?'✓ Lu':'● Non lu'}</span></td>
+                        <td className="px-4 py-3"><button onClick={()=>setSelectedPresc(p)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition border border-blue-200"><Eye className="w-4 h-4"/></button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -615,7 +676,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ APPELS VIDÉO ═════════════════════════════════════════════════ */}
+        {/* ══ APPELS VIDÉO ══ */}
         {activeTab === 'videocalls' && (
           <div className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -625,48 +686,34 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                <input type="text" placeholder="Médecin ou patient…" value={videoFilter} onChange={e => setVideoFilter(e.target.value)}
+                <input type="text" placeholder="Médecin ou patient…" value={videoFilter} onChange={e=>setVideoFilter(e.target.value)}
                   className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-64 bg-white"/>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                {l:'Total',    v:videoCalls.length,                                      c:'from-gray-400 to-gray-500'},
-                {l:'Terminés', v:videoCalls.filter(v=>v.status==='completed').length,     c:'from-green-500 to-emerald-600'},
-                {l:'Planifiés',v:videoCalls.filter(v=>v.status==='scheduled').length,     c:'from-blue-500 to-indigo-600'},
-                {l:'Manqués',  v:videoCalls.filter(v=>v.status==='missed').length,        c:'from-red-500 to-rose-600'},
-              ].map(({l,v,c})=>(
+              {[{l:'Total',v:videoCalls.length,c:'from-gray-400 to-gray-500'},{l:'Terminés',v:videoCalls.filter(v=>v.status==='completed').length,c:'from-green-500 to-emerald-600'},{l:'Planifiés',v:videoCalls.filter(v=>v.status==='scheduled').length,c:'from-blue-500 to-indigo-600'},{l:'Manqués',v:videoCalls.filter(v=>v.status==='missed').length,c:'from-red-500 to-rose-600'}].map(({l,v,c})=>(
                 <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
                   <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><Video className="w-5 h-5 text-white"/></div>
                   <div><p className="text-xs text-gray-500">{l}</p><p className="text-2xl font-bold text-gray-900">{v}</p></div>
                 </div>
               ))}
             </div>
-            {tabLoading ? <Spinner/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('videocalls')}/> :
-              fVideos.length === 0 ? <EmptyState icon={Video} label="Aucun appel vidéo" sub="Les appels apparaîtront ici dès les premières consultations vidéo"/> : (
+            {tabLoading ? <Spinner/> : tabError ? <ApiError error={tabError} retry={()=>fetchTab('videocalls')}/> :
+              fVideos.length === 0 ? <EmptyState icon={Video} label="Aucun appel vidéo"/> : (
               <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
                 <table className="w-full min-w-[600px]">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>{['Date','Médecin','Patient','Durée','Statut','Lien'].map(h=>(
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                    ))}</tr>
-                  </thead>
+                  <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Date','Médecin','Patient','Durée','Statut','Lien'].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>)}</tr></thead>
                   <tbody className="divide-y divide-gray-100">
-                    {fVideos.map(v => {
-                      const {date, time} = fmtDT(v.createdAt);
-                      const link = v.roomLink || v.meetingUrl;
-                      const dur  = v.durationMinutes || v.duration;
-                      return (
-                        <tr key={v.id} className="hover:bg-gray-50 transition">
-                          <td className="px-4 py-3 whitespace-nowrap"><p className="text-sm font-medium text-gray-900">{date}</p><p className="text-xs text-gray-500">{time}</p></td>
-                          <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {v.doctor?.firstName} {v.doctor?.lastName}</p><p className="text-xs text-gray-500">{v.doctor?.specialty}</p></td>
-                          <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{v.patient?.firstName} {v.patient?.lastName}</p><p className="text-xs text-gray-500">{v.patient?.phoneNumber}</p></td>
-                          <td className="px-4 py-3 text-sm text-gray-700">{dur ? `${dur} min` : '—'}</td>
-                          <td className="px-4 py-3"><Badge status={v.status}/></td>
-                          <td className="px-4 py-3">{link ? <a href={link} target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 transition">Rejoindre</a> : <span className="text-gray-400 text-xs">—</span>}</td>
-                        </tr>
-                      );
-                    })}
+                    {fVideos.map(v=>{const {date,time}=fmtDT(v.createdAt);const link=v.roomLink||v.meetingUrl;const dur=v.durationMinutes||v.duration;return(
+                      <tr key={v.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 whitespace-nowrap"><p className="text-sm font-medium text-gray-900">{date}</p><p className="text-xs text-gray-500">{time}</p></td>
+                        <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {v.doctor?.firstName} {v.doctor?.lastName}</p><p className="text-xs text-gray-500">{v.doctor?.specialty}</p></td>
+                        <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{v.patient?.firstName} {v.patient?.lastName}</p><p className="text-xs text-gray-500">{v.patient?.phoneNumber}</p></td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{dur?`${dur} min`:'—'}</td>
+                        <td className="px-4 py-3"><Badge status={v.status}/></td>
+                        <td className="px-4 py-3">{link?<a href={link} target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 transition">Rejoindre</a>:<span className="text-gray-400 text-xs">—</span>}</td>
+                      </tr>
+                    );})}
                   </tbody>
                 </table>
               </div>
@@ -682,43 +729,46 @@ const AdminDashboard: React.FC = () => {
               <div><h2 className="text-xl font-bold text-gray-900">Paiements des médecins</h2><p className="text-sm text-gray-500">Gérez les versements et suivez les soldes</p></div>
             </div>
 
-            {tabLoading ? <Spinner label="Calcul des revenus…"/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('payments')}/> : (
+            {tabLoading ? <Spinner label="Calcul des revenus…"/> : tabError ? <ApiError error={tabError} retry={()=>fetchTab('payments')}/> : (
               <>
                 {/* KPIs */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white rounded-xl border border-red-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><AlertCircle className="w-4 h-4 text-red-400"/>Total dû</p>
+                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><AlertCircle className="w-4 h-4 text-red-400"/>Total dû aux médecins</p>
                     <p className="text-3xl font-bold text-red-600">{earnings.reduce((s,e)=>s+(e.stats?.amountDue||0),0).toFixed(0)} XOF</p>
                     <p className="text-xs text-gray-400 mt-1">{pendingPayCount} médecin(s) en attente</p>
                   </div>
                   <div className="bg-white rounded-xl border border-green-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><CheckCircle className="w-4 h-4 text-green-400"/>Total versé</p>
+                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><CheckCircle className="w-4 h-4 text-green-400"/>Total déjà versé</p>
                     <p className="text-3xl font-bold text-green-600">{earnings.reduce((s,e)=>s+(e.stats?.totalPaid||0),0).toFixed(0)} XOF</p>
-                    <p className="text-xs text-gray-400 mt-1">{payments.length} paiement(s)</p>
+                    <p className="text-xs text-gray-400 mt-1">{payments.length} paiement(s) effectué(s)</p>
                   </div>
                   <div className="bg-white rounded-xl border border-blue-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><Activity className="w-4 h-4 text-blue-400"/>Consultations</p>
+                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><Activity className="w-4 h-4 text-blue-400"/>Consultations totales</p>
                     <p className="text-3xl font-bold text-blue-600">{earnings.reduce((s,e)=>s+(e.stats?.completedConsultations||0),0)}</p>
-                    <p className="text-xs text-gray-400 mt-1">Au total</p>
+                    <p className="text-xs text-gray-400 mt-1">Parmi tous les médecins</p>
                   </div>
                 </div>
 
-                {/* Filtre */}
+                {/* Revenus par médecin */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                    <input type="text" placeholder="Filtrer par médecin…" value={payFilter} onChange={e => setPayFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-300 w-64 bg-white"/>
+                    <input type="text" placeholder="Filtrer…" value={payFilter} onChange={e=>setPayFilter(e.target.value)}
+                      className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-300 w-56 bg-white"/>
                   </div>
                 </div>
 
-                {fEarn.length === 0 ? <EmptyState icon={Users} label="Aucun médecin enregistré"/> : (
+                {fEarn.length === 0
+                  ? <EmptyState icon={Users} label="Aucun médecin enregistré"/>
+                  : (
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
                     <div className="divide-y divide-gray-100">
                       {fEarn.map(e => (
                         <div key={e.doctor.id} className="p-5 hover:bg-gray-50 transition">
                           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            {/* Identité */}
                             <div className="flex items-center gap-4 min-w-0">
                               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md shrink-0 text-lg">
                                 {(e.doctor.firstName||'?')[0]}{(e.doctor.lastName||'?')[0]}
@@ -729,7 +779,8 @@ const AdminDashboard: React.FC = () => {
                                 <p className="text-xs text-gray-400 truncate">{e.doctor.email}</p>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-3">
+                            {/* Chiffres */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                               <div className="text-center p-2 bg-gray-50 rounded-xl"><p className="text-xs text-gray-500">Consultations</p><p className="font-bold text-gray-900 text-xl">{e.stats.completedConsultations}</p><p className="text-xs text-gray-400">{e.stats.paidConsultations} payées</p></div>
                               <div className="text-center p-2 bg-blue-50 border border-blue-100 rounded-xl"><p className="text-xs text-blue-500">Part (90%)</p><p className="font-bold text-blue-700 text-lg">{e.stats.doctorShare}</p><p className="text-xs text-blue-400">XOF</p></div>
                               <div className="text-center p-2 bg-green-50 border border-green-100 rounded-xl"><p className="text-xs text-green-500">Versé</p><p className="font-bold text-green-700 text-lg">{e.stats.totalPaid}</p><p className="text-xs text-green-400">XOF</p></div>
@@ -739,19 +790,19 @@ const AdminDashboard: React.FC = () => {
                                 <p className={`text-xs ${e.stats.amountDue>0?'text-red-400':'text-gray-300'}`}>XOF</p>
                               </div>
                             </div>
-                            <button onClick={() => openPayModal(e)} disabled={e.stats.amountDue <= 0}
-                              className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${
-                                e.stats.amountDue > 0 ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:scale-105 shadow-md' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              }`}>
-                              <Send className="w-4 h-4"/>{e.stats.amountDue > 0 ? 'Payer' : '✓ À jour'}
+                            {/* Bouton payer */}
+                            <button onClick={()=>openPayModal(e)} disabled={e.stats.amountDue<=0}
+                              className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${e.stats.amountDue>0?'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:scale-105 shadow-md':'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
+                              <Send className="w-4 h-4"/>{e.stats.amountDue>0?'Payer':'✓ À jour'}
                             </button>
                           </div>
-                          {(e.paymentHistory || []).length > 0 && (
+                          {/* Historique rapide */}
+                          {(e.paymentHistory||[]).length > 0 && (
                             <div className="mt-3 ml-16 flex flex-wrap gap-2">
                               {e.paymentHistory.slice(0,3).map((p:any,i:number)=>(
-                                <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs">✓ {p.amount} {p.currency||'XOF'} — {p.period || fmtDate(p.processedAt)}</span>
+                                <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs">✓ {p.amount} {p.currency||'XOF'} — {p.period||fmtDate(p.processedAt)}</span>
                               ))}
-                              {e.paymentHistory.length > 3 && <span className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-full text-xs">+{e.paymentHistory.length-3}</span>}
+                              {e.paymentHistory.length>3&&<span className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-full text-xs">+{e.paymentHistory.length-3}</span>}
                             </div>
                           )}
                         </div>
@@ -760,26 +811,31 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Historique */}
-                {payments.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                      <Receipt className="w-5 h-5 text-gray-500"/>
-                      <h3 className="font-semibold text-gray-900">Historique des paiements</h3>
-                      <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
+                {/* ── HISTORIQUE GLOBAL — toujours visible ─────────────────── */}
+                <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-gray-500"/>
+                    <h3 className="font-semibold text-gray-900">Historique de tous les paiements</h3>
+                    <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
+                  </div>
+                  {payments.length === 0 ? (
+                    <div className="text-center py-10">
+                      <Receipt className="w-10 h-10 text-gray-200 mx-auto mb-2"/>
+                      <p className="text-sm text-gray-400">Aucun paiement effectué pour l'instant</p>
                     </div>
+                  ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[600px]">
                         <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>{['Date','Médecin','Montant','Méthode','Période','Statut'].map(h=>(
+                          <tr>{['Date','Médecin','Montant','Méthode','Période','Statut','Traité par'].map(h=>(
                             <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                           ))}</tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {payments.map(p => {
-                            const method = PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
-                            const MI = method?.icon || Banknote;
-                            return (
+                          {payments.map(p=>{
+                            const method=PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
+                            const MI=method?.icon||Banknote;
+                            return(
                               <tr key={p.id} className="hover:bg-gray-50 transition">
                                 <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
                                 <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p><p className="text-xs text-gray-500">{p.doctor?.specialty}</p></td>
@@ -787,14 +843,15 @@ const AdminDashboard: React.FC = () => {
                                 <td className="px-4 py-3"><span className={`flex items-center gap-1.5 text-sm ${method?.color||'text-gray-600'}`}><MI className="w-4 h-4"/>{method?.label||p.paymentMethod}</span></td>
                                 <td className="px-4 py-3 text-sm text-gray-600">{p.period||'—'}</td>
                                 <td className="px-4 py-3"><Badge status={p.status}/></td>
+                                <td className="px-4 py-3 text-xs text-gray-500">{p.processor?`${p.processor.firstName} ${p.processor.lastName}`:'—'}</td>
                               </tr>
                             );
                           })}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -826,27 +883,20 @@ const AdminDashboard: React.FC = () => {
         {activeTab === 'calendars' && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-gray-900">Gestion des calendriers ({calendars.length})</h2>
-            {calendars.length === 0 ? <EmptyState icon={Calendar} label="Aucun calendrier" sub="Les médecins n'ont pas encore créé de disponibilités"/> : (
+            {calendars.length === 0 ? <EmptyState icon={Calendar} label="Aucun calendrier"/> : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {calendars.map(cal => (
+                {calendars.map(cal=>(
                   <div key={cal.id} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-xl hover:-translate-y-1 transition-all">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg shadow-md"><Calendar className="w-5 h-5 text-white"/></div>
-                        <div>
-                          <p className="font-bold text-gray-900">{fmtDate(cal.date)}</p>
-                          <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5"><Award className="w-3.5 h-3.5 text-purple-400"/>Dr. {cal.doctor?.firstName} {cal.doctor?.lastName}</p>
-                        </div>
+                        <div><p className="font-bold text-gray-900">{fmtDate(cal.date)}</p><p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5"><Award className="w-3.5 h-3.5 text-purple-400"/>Dr. {cal.doctor?.firstName} {cal.doctor?.lastName}</p></div>
                       </div>
-                      <Badge status={cal.confirmed ? 'completed' : 'pending'}/>
+                      <Badge status={cal.confirmed?'completed':'pending'}/>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 mb-4">
-                      {(cal.slots || []).map((s,i)=><span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium">{s}</span>)}
-                    </div>
+                    <div className="flex flex-wrap gap-1.5 mb-4">{(cal.slots||[]).map((s,i)=><span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium">{s}</span>)}</div>
                     <div className="flex justify-end border-t border-gray-100 pt-3">
-                      <button onClick={() => handleDeleteCalendar(cal.id)} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium flex items-center gap-2">
-                        <Trash className="w-4 h-4"/> Supprimer
-                      </button>
+                      <button onClick={()=>handleDeleteCalendar(cal.id)} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm font-medium flex items-center gap-2"><Trash className="w-4 h-4"/>Supprimer</button>
                     </div>
                   </div>
                 ))}
@@ -856,72 +906,124 @@ const AdminDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* ══ MODAL PAIEMENT ════════════════════════════════════════════════════ */}
+      {/* ══════════════ MODAL PAIEMENT ══════════════════════════════════════ */}
       {showPayModal && selectedEarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-              <div><h2 className="text-xl font-bold text-gray-900">Payer Dr. {selectedEarning.doctor.firstName} {selectedEarning.doctor.lastName}</h2><p className="text-sm text-gray-500 mt-0.5">{selectedEarning.doctor.specialty}</p></div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Payer Dr. {selectedEarning.doctor.firstName} {selectedEarning.doctor.lastName}</h2>
+                <p className="text-sm text-gray-500 mt-0.5">{selectedEarning.doctor.specialty}</p>
+              </div>
               <button onClick={()=>setShowPayModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition"><X className="w-5 h-5 text-gray-500"/></button>
             </div>
-            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
               {/* Résumé */}
               <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                {[{l:'Consultations non payées',v:selectedEarning.stats.unpaidConsultations,c:'text-gray-900'},{l:'Montant suggéré',v:`${selectedEarning.stats.amountDue} XOF`,c:'text-green-600'},{l:'Part médecin',v:'90%',c:'text-blue-600'}].map(({l,v,c})=>(
+                {[{l:'Consult. non payées',v:selectedEarning.stats.unpaidConsultations,c:'text-gray-900'},{l:'Montant suggéré',v:`${selectedEarning.stats.amountDue} XOF`,c:'text-green-600'},{l:'Part médecin',v:'90%',c:'text-blue-600'}].map(({l,v,c})=>(
                   <div key={l} className="text-center"><p className="text-xs text-gray-500 mb-1 leading-tight">{l}</p><p className={`text-xl font-bold ${c}`}>{v}</p></div>
                 ))}
               </div>
+
               {/* Montant + devise */}
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Montant *</label><input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))} className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="0"/></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Devise</label><select value={payForm.currency} onChange={e=>setPayForm(f=>({...f,currency:e.target.value}))} className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">{['XOF','EUR','USD','GHS','XAF'].map(c=><option key={c}>{c}</option>)}</select></div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Montant *</label>
+                  <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="0"/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Devise</label>
+                  <select value={payForm.currency} onChange={e=>setPayForm(f=>({...f,currency:e.target.value}))}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
+                    {['XOF','EUR','USD','GHS','XAF'].map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Période</label><input type="text" value={payForm.period} onChange={e=>setPayForm(f=>({...f,period:e.target.value}))} placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Nb consultations</label><input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))} className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/></div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Période</label>
+                  <input type="text" value={payForm.period} onChange={e=>setPayForm(f=>({...f,period:e.target.value}))}
+                    placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Nb consultations</label>
+                  <input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
+                </div>
               </div>
-              {/* Méthode */}
+
+              {/* ── Méthode de paiement ── */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Méthode de paiement *</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {PAYMENT_METHODS.map(m=>{const Icon=m.icon;const active=payForm.paymentMethod===m.value;return(
-                    <button key={m.value} onClick={()=>setPayForm(f=>({...f,paymentMethod:m.value}))}
-                      className={`p-3 border-2 rounded-xl flex items-center gap-2 transition-all text-sm font-medium ${active?'border-green-500 bg-green-50 text-green-700':'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                      <Icon className={`w-5 h-5 ${active?'text-green-600':m.color}`}/>{m.label}
-                    </button>
-                  );})}
+                  {PAYMENT_METHODS.map(m => {
+                    const Icon = m.icon;
+                    const active = payForm.paymentMethod === m.value;
+                    return (
+                      <button key={m.value} type="button"
+                        onClick={() => setPayForm(f => ({ ...f, paymentMethod: m.value }))}
+                        className={`p-3 border-2 rounded-xl flex items-center gap-2 transition-all text-sm font-medium ${active ? 'border-green-500 bg-green-50 text-green-700 shadow-md' : 'border-gray-200 text-gray-600 hover:border-green-300 hover:bg-green-50/30'}`}>
+                        <Icon className={`w-5 h-5 ${active ? 'text-green-600' : m.color}`}/>
+                        {m.label}
+                        {active && <CheckCircle className="w-4 h-4 ml-auto text-green-500"/>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              {/* Détails */}
-              {payForm.paymentMethod==='bank_transfer' && (
+
+              {/* ── Détails selon méthode ── */}
+              {payForm.paymentMethod === 'bank_transfer' && (
                 <div className="space-y-2 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                  <p className="text-sm font-semibold text-blue-700 flex items-center gap-2"><Building2 className="w-4 h-4"/>Détails virement</p>
-                  {[{pl:'Nom de la banque',k:'bankName'},{pl:'Numéro de compte',k:'accountNumber'},{pl:'IBAN (optionnel)',k:'iban'}].map(({pl,k})=>(
-                    <input key={k} placeholder={pl} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))} className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
-                  ))}
+                  <p className="text-sm font-semibold text-blue-700 flex items-center gap-2"><Building2 className="w-4 h-4"/>Informations bancaires</p>
+                  <input placeholder="Nom de la banque *" value={payForm.bankName} onChange={e=>setPayForm(f=>({...f,bankName:e.target.value}))}
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
+                  <input placeholder="Numéro de compte *" value={payForm.accountNumber} onChange={e=>setPayForm(f=>({...f,accountNumber:e.target.value}))}
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
+                  <input placeholder="IBAN (optionnel)" value={payForm.iban} onChange={e=>setPayForm(f=>({...f,iban:e.target.value}))}
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
                 </div>
               )}
-              {payForm.paymentMethod==='mobile_money' && (
+
+              {payForm.paymentMethod === 'mobile_money' && (
                 <div className="space-y-2 p-4 bg-green-50 rounded-xl border border-green-200">
                   <p className="text-sm font-semibold text-green-700 flex items-center gap-2"><Smartphone className="w-4 h-4"/>Mobile Money</p>
-                  <select value={payForm.provider} onChange={e=>setPayForm(f=>({...f,provider:e.target.value}))} className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
-                    <option value="">Choisir un opérateur</option>
-                    {MOBILE_OPERATORS.map(op=><option key={op}>{op}</option>)}
+                  <select value={payForm.provider} onChange={e=>setPayForm(f=>({...f,provider:e.target.value}))}
+                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
+                    <option value="">— Choisir un opérateur —</option>
+                    {MOBILE_OPERATORS.map(op=><option key={op} value={op}>{op}</option>)}
                   </select>
-                  <input placeholder="Numéro de téléphone" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))} className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"/>
+                  <input placeholder="Numéro de téléphone *" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
+                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"/>
                 </div>
               )}
-              {(payForm.paymentMethod==='cash'||payForm.paymentMethod==='check') && (
+
+              {(payForm.paymentMethod === 'cash' || payForm.paymentMethod === 'check') && (
                 <div className="space-y-2 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-                  <p className="text-sm font-semibold text-yellow-700 flex items-center gap-2"><Banknote className="w-4 h-4"/>Référence</p>
-                  <input placeholder="Numéro de référence / reçu" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))} className="w-full px-3 py-2 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"/>
+                  <p className="text-sm font-semibold text-yellow-700 flex items-center gap-2">
+                    <Banknote className="w-4 h-4"/>{payForm.paymentMethod === 'cash' ? 'Paiement en espèces' : 'Paiement par chèque'}
+                  </p>
+                  <input placeholder="Numéro de référence / reçu" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                    className="w-full px-3 py-2 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"/>
                 </div>
               )}
-              <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Notes (optionnel)</label><textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))} placeholder="Observations…" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"/></div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Notes (optionnel)</label>
+                <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
+                  placeholder="Observations, justificatifs…"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"/>
+              </div>
+
+              {/* Boutons */}
               <div className="flex gap-3 pt-2">
                 <button onClick={()=>setShowPayModal(false)} className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm">Annuler</button>
-                <button onClick={submitPayment} disabled={payLoading} className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 text-sm">
-                  {payLoading?<Loader2 className="w-5 h-5 animate-spin"/>:<><Send className="w-4 h-4"/>Confirmer</>}
+                <button onClick={submitPayment} disabled={payLoading}
+                  className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 text-sm">
+                  {payLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : <><Send className="w-4 h-4"/>Confirmer le paiement</>}
                 </button>
               </div>
             </div>
@@ -929,7 +1031,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ══ MODAL PRESCRIPTION ════════════════════════════════════════════════ */}
+      {/* ══════════════ MODAL PRESCRIPTION ═════════════════════════════════ */}
       {selectedPresc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={()=>setSelectedPresc(null)}>
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
@@ -945,7 +1047,7 @@ const AdminDashboard: React.FC = () => {
               <div>
                 <p className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Médicaments</p>
                 <div className="space-y-2">
-                  {(selectedPresc.medications || []).map((m,i)=>(
+                  {(selectedPresc.medications||[]).map((m,i)=>(
                     <div key={i} className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
                       <p className="font-semibold text-gray-900">💊 {m.medication}</p>
                       <div className="grid grid-cols-3 gap-2 mt-2">
