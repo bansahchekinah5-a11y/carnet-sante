@@ -50,7 +50,7 @@ const Login: React.FC = () => {
               onClick={() => navigate('/')}
             >
               <div className="w-14 h-14 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-transform">
-                <span className="text-2xl">⚕️</span>
+                <span className="text-2xl">   <link rel="icon" type="image/png" href="/logo.png" /></span>
               </div>
               <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                 NEXUS HEALTH
