@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/userService';
 import { appointmentService } from '../../services/appointmentService';
+import { medicalFileService } from '../../services/medicalFileService';
 import {
   Calendar, Users, Clock, X, Check, Bell, ChevronRight,
   LogOut, Plus, Video, FileText, Pill, Search, Send,
@@ -43,7 +44,6 @@ interface DoctorUser {
   specialty?: string;
 }
 
-// ─── Prescription line ───────────────────────────────────────────────────────
 interface PrescriptionLine {
   id: string;
   medication: string;
@@ -61,28 +61,32 @@ const DoctorDashboard: React.FC = () => {
   const { showNotification } = useNotification();
   const doctorUser = user as DoctorUser;
 
-  const [appointments, setAppointments]             = useState<Appointment[]>([]);
-  const [loading, setLoading]                       = useState(true);
+  const [appointments, setAppointments]               = useState<Appointment[]>([]);
+  const [loading, setLoading]                         = useState(true);
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
-  const [error, setError]                           = useState<string | null>(null);
-  const [filter, setFilter]                         = useState<'today' | 'pending' | 'upcoming'>('pending');
-  const [stats, setStats]                           = useState({ totalAppointments: 0, todayAppointments: 0, totalPatients: 0 });
+  const [error, setError]                             = useState<string | null>(null);
+  const [filter, setFilter]                           = useState<'today' | 'pending' | 'upcoming'>('pending');
+  const [stats, setStats]                             = useState({ totalAppointments: 0, todayAppointments: 0, totalPatients: 0 });
 
   // ── Prescription state ──────────────────────────────────────────────────────
-  const [showPrescription, setShowPrescription]     = useState(false);
-  const [prescriptionPatient, setPrescriptionPatient] = useState<Appointment['patient'] | null>(null);
-  const [prescriptionLines, setPrescriptionLines]   = useState<PrescriptionLine[]>([
+  const [showPrescription, setShowPrescription]           = useState(false);
+  const [prescriptionPatient, setPrescriptionPatient]     = useState<Appointment['patient'] | null>(null);
+  const [prescriptionAppointmentId, setPrescriptionAppointmentId] = useState<string | null>(null);
+  const [prescriptionLines, setPrescriptionLines]         = useState<PrescriptionLine[]>([
     { id: '1', medication: '', dosage: '', frequency: '1 fois/jour', duration: '7 jours', instructions: '' }
   ]);
-  const [prescriptionNote, setPrescriptionNote]     = useState('');
-  const [prescriptionSent, setPrescriptionSent]     = useState(false);
-  const [searchPatient, setSearchPatient]           = useState('');
+  const [prescriptionNote, setPrescriptionNote]           = useState('');
+  const [prescriptionSent, setPrescriptionSent]           = useState(false);
+  const [prescriptionLoading, setPrescriptionLoading]     = useState(false);
+  const [searchPatient, setSearchPatient]                 = useState('');
 
   // ── Video call state ────────────────────────────────────────────────────────
-  const [showVideoModal, setShowVideoModal]         = useState(false);
-  const [videoPatient, setVideoPatient]             = useState<Appointment['patient'] | null>(null);
-  const [videoLink, setVideoLink]                   = useState('');
-  const [videoSearchPatient, setVideoSearchPatient] = useState('');
+  const [showVideoModal, setShowVideoModal]             = useState(false);
+  const [videoPatient, setVideoPatient]                 = useState<Appointment['patient'] | null>(null);
+  const [videoAppointmentId, setVideoAppointmentId]     = useState<string | null>(null);
+  const [videoLink, setVideoLink]                       = useState('');
+  const [videoLoading, setVideoLoading]                 = useState(false);
+  const [videoSearchPatient, setVideoSearchPatient]     = useState('');
 
   // ─────────────────────────────────────────────────────────────────────────────
   // DATA FETCHING
@@ -131,7 +135,7 @@ const DoctorDashboard: React.FC = () => {
   }, [user]);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // APPOINTMENTS ACTIONS
+  // APPOINTMENTS
   // ─────────────────────────────────────────────────────────────────────────────
 
   const handleConfirmAppointment = async (appointmentId: string) => {
@@ -152,11 +156,12 @@ const DoctorDashboard: React.FC = () => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // PRESCRIPTION ACTIONS
+  // ✅ PRESCRIPTION — APPEL API RÉEL
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const openPrescription = (patient: Appointment['patient']) => {
+  const openPrescription = (patient: Appointment['patient'], appointmentId?: string) => {
     setPrescriptionPatient(patient);
+    setPrescriptionAppointmentId(appointmentId || null);
     setPrescriptionLines([{ id: '1', medication: '', dosage: '', frequency: '1 fois/jour', duration: '7 jours', instructions: '' }]);
     setPrescriptionNote('');
     setPrescriptionSent(false);
@@ -179,31 +184,96 @@ const DoctorDashboard: React.FC = () => {
     setPrescriptionLines(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
   };
 
+  // ✅ CORRIGÉ : appel API réel au lieu de la simulation
   const sendPrescription = async () => {
     const valid = prescriptionLines.every(l => l.medication.trim() && l.dosage.trim());
-    if (!valid) { showNotification('⚠️ Remplissez le médicament et la posologie pour chaque ligne', 'warning'); return; }
-    // TODO: appel API pour sauvegarder et envoyer la prescription
-    await new Promise(r => setTimeout(r, 800)); // simulation
-    setPrescriptionSent(true);
-    showNotification(`✅ Ordonnance envoyée à ${prescriptionPatient?.firstName} ${prescriptionPatient?.lastName}`, 'success');
+    if (!valid) {
+      showNotification('⚠️ Remplissez le médicament et la posologie pour chaque ligne', 'warning');
+      return;
+    }
+    if (!prescriptionPatient) return;
+
+    try {
+      setPrescriptionLoading(true);
+
+      // Formater les médicaments pour l'API
+      const medications = prescriptionLines.map(l => ({
+        medication:   l.medication.trim(),
+        dosage:       l.dosage.trim(),
+        frequency:    l.frequency,
+        duration:     l.duration,
+        instructions: l.instructions.trim() || undefined
+      }));
+
+      // ✅ Appel API réel → POST /api/prescriptions
+      await medicalFileService.createPrescription({
+        patientId:     prescriptionPatient.id,
+        appointmentId: prescriptionAppointmentId || undefined,
+        medications,
+        notes:         prescriptionNote.trim() || undefined,
+      });
+
+      setPrescriptionSent(true);
+      showNotification(
+        `✅ Ordonnance envoyée à ${prescriptionPatient.firstName} ${prescriptionPatient.lastName}`,
+        'success'
+      );
+    } catch (error: any) {
+      console.error('❌ Erreur envoi prescription:', error);
+      showNotification(
+        error?.response?.data?.message || '❌ Erreur lors de l\'envoi de l\'ordonnance',
+        'error'
+      );
+    } finally {
+      setPrescriptionLoading(false);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // VIDEO CALL ACTIONS
+  // ✅ APPEL VIDÉO — APPEL API RÉEL
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const openVideoModal = (patient: Appointment['patient']) => {
+  const openVideoModal = (patient: Appointment['patient'], appointmentId?: string) => {
     setVideoPatient(patient);
-    // Génère un lien Jitsi unique
+    setVideoAppointmentId(appointmentId || null);
     const roomName = `CarnetSante-${doctorUser?.lastName}-${patient.lastName}-${Date.now()}`.replace(/\s+/g, '');
     setVideoLink(`https://meet.jit.si/${roomName}`);
     setShowVideoModal(true);
   };
 
-  const startVideoCall = () => {
-    window.open(videoLink, '_blank');
-    showNotification(`📹 Appel vidéo lancé avec ${videoPatient?.firstName} ${videoPatient?.lastName}`, 'success');
-    // TODO: notifier le patient par email/SMS avec le lien
+  // ✅ CORRIGÉ : sauvegarde en BDD puis ouvre le lien
+  const startVideoCall = async () => {
+    if (!videoPatient || !videoLink) return;
+
+    try {
+      setVideoLoading(true);
+
+      // ✅ Appel API réel → POST /api/video-calls
+      await medicalFileService.createVideoCall({
+        patientId:     videoPatient.id,
+        appointmentId: videoAppointmentId || undefined,
+        roomLink:      videoLink,
+        notes:         `Téléconsultation avec Dr. ${doctorUser?.lastName}`,
+      });
+
+      // Ouvrir la salle vidéo
+      window.open(videoLink, '_blank');
+
+      showNotification(
+        `📹 Appel vidéo lancé avec ${videoPatient.firstName} ${videoPatient.lastName}. Le patient peut consulter le lien dans son dossier.`,
+        'success'
+      );
+
+      setShowVideoModal(false);
+    } catch (error: any) {
+      console.error('❌ Erreur création appel vidéo:', error);
+      showNotification(
+        error?.response?.data?.message || '❌ Erreur lors de la création de l\'appel vidéo',
+        'error'
+      );
+    } finally {
+      setVideoLoading(false);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -221,7 +291,6 @@ const DoctorDashboard: React.FC = () => {
     }
   });
 
-  // Patients uniques ayant un RDV confirmé (pour prescription & vidéo)
   const confirmedPatients = Array.from(
     new Map(
       appointments
@@ -261,7 +330,7 @@ const DoctorDashboard: React.FC = () => {
   return (
     <div className="min-h-screen p-6 space-y-6">
 
-      {/* ── HEADER ─────────────────────────────────────────────────────────────── */}
+      {/* HEADER */}
       <div className="futuristic-card p-6 animate-slide-in">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
@@ -298,7 +367,7 @@ const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── ERREUR ─────────────────────────────────────────────────────────────── */}
+      {/* ERREUR */}
       {error && (
         <div className="futuristic-card p-4 border-red-500/50 bg-red-500/10 animate-slide-in">
           <div className="flex items-center gap-3">
@@ -309,7 +378,7 @@ const DoctorDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ── STATS ──────────────────────────────────────────────────────────────── */}
+      {/* STATS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
@@ -329,7 +398,7 @@ const DoctorDashboard: React.FC = () => {
         })}
       </div>
 
-      {/* ── OUTILS MÉDICAUX : PRESCRIPTION + VIDÉO ─────────────────────────────── */}
+      {/* OUTILS MÉDICAUX */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* PRESCRIPTION */}
@@ -340,11 +409,9 @@ const DoctorDashboard: React.FC = () => {
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">Rédiger une ordonnance</h3>
-              <p className="text-gray-400 text-sm">Sélectionnez un patient avec RDV confirmé</p>
+              <p className="text-gray-400 text-sm">Patients avec RDV confirmé</p>
             </div>
           </div>
-
-          {/* Recherche patient */}
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -355,15 +422,13 @@ const DoctorDashboard: React.FC = () => {
               className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
             />
           </div>
-
-          {/* Liste patients */}
           {confirmedPatients.length === 0 ? (
             <div className="text-center py-8">
               <Stethoscope className="w-10 h-10 text-gray-600 mx-auto mb-2" />
               <p className="text-gray-500 text-sm">Aucun patient avec RDV confirmé</p>
             </div>
           ) : filteredPrescriptionPatients.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-4">Aucun résultat pour "{searchPatient}"</p>
+            <p className="text-gray-500 text-sm text-center py-4">Aucun résultat</p>
           ) : (
             <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
               {filteredPrescriptionPatients.map(patient => (
@@ -381,8 +446,7 @@ const DoctorDashboard: React.FC = () => {
                     onClick={() => openPrescription(patient)}
                     className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-semibold hover:bg-emerald-500/30 transition-all flex items-center gap-1"
                   >
-                    <Plus className="w-3 h-3" />
-                    Prescrire
+                    <Plus className="w-3 h-3" /> Prescrire
                   </button>
                 </div>
               ))}
@@ -401,8 +465,6 @@ const DoctorDashboard: React.FC = () => {
               <p className="text-gray-400 text-sm">Téléconsultation avec un patient</p>
             </div>
           </div>
-
-          {/* Recherche patient */}
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -413,15 +475,13 @@ const DoctorDashboard: React.FC = () => {
               className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 text-sm"
             />
           </div>
-
-          {/* Liste patients */}
           {confirmedPatients.length === 0 ? (
             <div className="text-center py-8">
               <Video className="w-10 h-10 text-gray-600 mx-auto mb-2" />
               <p className="text-gray-500 text-sm">Aucun patient avec RDV confirmé</p>
             </div>
           ) : filteredVideoPatients.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-4">Aucun résultat pour "{videoSearchPatient}"</p>
+            <p className="text-gray-500 text-sm text-center py-4">Aucun résultat</p>
           ) : (
             <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
               {filteredVideoPatients.map(patient => (
@@ -439,8 +499,7 @@ const DoctorDashboard: React.FC = () => {
                     onClick={() => openVideoModal(patient)}
                     className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-semibold hover:bg-blue-500/30 transition-all flex items-center gap-1"
                   >
-                    <Video className="w-3 h-3" />
-                    Appeler
+                    <Video className="w-3 h-3" /> Appeler
                   </button>
                 </div>
               ))}
@@ -449,7 +508,7 @@ const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── RENDEZ-VOUS + ACTIONS RAPIDES ──────────────────────────────────────── */}
+      {/* RENDEZ-VOUS + ACTIONS RAPIDES */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 futuristic-card p-6">
           <div className="flex justify-between items-center mb-6">
@@ -537,10 +596,11 @@ const DoctorDashboard: React.FC = () => {
                         )}
                         {apt.status === 'confirmed' && (
                           <>
-                            <button onClick={() => openPrescription(apt.patient)} className="px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-500/30 transition-all">
+                            {/* ✅ On passe l'appointmentId pour lier la prescription au RDV */}
+                            <button onClick={() => openPrescription(apt.patient, apt.id)} className="px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-500/30 transition-all">
                               <FileText className="w-3.5 h-3.5" /> Ordonnance
                             </button>
-                            <button onClick={() => openVideoModal(apt.patient)} className="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 hover:bg-blue-500/30 transition-all">
+                            <button onClick={() => openVideoModal(apt.patient, apt.id)} className="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 hover:bg-blue-500/30 transition-all">
                               <Video className="w-3.5 h-3.5" /> Appel vidéo
                             </button>
                             <Link to={`/appointments/${apt.id}`} className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg transition-all hover:scale-105">
@@ -613,7 +673,7 @@ const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── GESTION CALENDRIER ─────────────────────────────────────────────────── */}
+      {/* GESTION CALENDRIER */}
       <div className="futuristic-card p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -626,14 +686,11 @@ const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════════
-          MODAL ORDONNANCE
-      ══════════════════════════════════════════════════════════════════════════ */}
+      {/* ══════════════════ MODAL ORDONNANCE ══════════════════ */}
       {showPrescription && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) setShowPrescription(false); }}>
           <div className="w-full max-w-2xl bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
 
-            {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-white/10 bg-gradient-to-r from-emerald-500/10 to-teal-500/10">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-500/20 rounded-xl"><FileText className="w-5 h-5 text-emerald-400" /></div>
@@ -650,11 +707,13 @@ const DoctorDashboard: React.FC = () => {
             </div>
 
             {prescriptionSent ? (
-              /* Confirmation */
               <div className="p-12 text-center space-y-4">
                 <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto" />
                 <h3 className="text-2xl font-bold text-white">Ordonnance envoyée !</h3>
-                <p className="text-gray-400">L'ordonnance a été transmise à {prescriptionPatient?.firstName} {prescriptionPatient?.lastName}.</p>
+                <p className="text-gray-400">
+                  L'ordonnance est maintenant visible dans le dossier médical de{' '}
+                  {prescriptionPatient?.firstName} {prescriptionPatient?.lastName}.
+                </p>
                 <button onClick={() => setShowPrescription(false)} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold transition-colors">
                   Fermer
                 </button>
@@ -662,67 +721,54 @@ const DoctorDashboard: React.FC = () => {
             ) : (
               <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
 
-                {/* Lignes médicaments */}
-                <div className="space-y-3">
-                  {prescriptionLines.map((line, idx) => (
-                    <div key={line.id} className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <Pill className="w-3.5 h-3.5" /> Médicament {idx + 1}
-                        </span>
-                        {prescriptionLines.length > 1 && (
-                          <button onClick={() => removePrescriptionLine(line.id)} className="text-red-400 hover:text-red-300 transition-colors">
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          placeholder="Nom du médicament *"
-                          value={line.medication}
-                          onChange={e => updateLine(line.id, 'medication', e.target.value)}
-                          className="col-span-2 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Posologie (ex: 1 comprimé) *"
-                          value={line.dosage}
-                          onChange={e => updateLine(line.id, 'dosage', e.target.value)}
-                          className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
-                        />
-                        <select
-                          value={line.frequency}
-                          onChange={e => updateLine(line.id, 'frequency', e.target.value)}
-                          className="px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500/50 text-sm"
-                        >
-                          {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
-                        </select>
-                        <select
-                          value={line.duration}
-                          onChange={e => updateLine(line.id, 'duration', e.target.value)}
-                          className="px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500/50 text-sm"
-                        >
-                          {DURATIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
-                        <input
-                          type="text"
-                          placeholder="Instructions particulières"
-                          value={line.instructions}
-                          onChange={e => updateLine(line.id, 'instructions', e.target.value)}
-                          className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
-                        />
-                      </div>
+                {prescriptionLines.map((line, idx) => (
+                  <div key={line.id} className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Pill className="w-3.5 h-3.5" /> Médicament {idx + 1}
+                      </span>
+                      {prescriptionLines.length > 1 && (
+                        <button onClick={() => removePrescriptionLine(line.id)} className="text-red-400 hover:text-red-300 transition-colors">
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                  ))}
-                </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Nom du médicament *"
+                        value={line.medication}
+                        onChange={e => updateLine(line.id, 'medication', e.target.value)}
+                        className="col-span-2 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Posologie (ex: 1 comprimé) *"
+                        value={line.dosage}
+                        onChange={e => updateLine(line.id, 'dosage', e.target.value)}
+                        className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
+                      />
+                      <select value={line.frequency} onChange={e => updateLine(line.id, 'frequency', e.target.value)} className="px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500/50 text-sm">
+                        {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
+                      </select>
+                      <select value={line.duration} onChange={e => updateLine(line.id, 'duration', e.target.value)} className="px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500/50 text-sm">
+                        {DURATIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Instructions particulières"
+                        value={line.instructions}
+                        onChange={e => updateLine(line.id, 'instructions', e.target.value)}
+                        className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
+                      />
+                    </div>
+                  </div>
+                ))}
 
-                {/* Ajouter médicament */}
                 <button onClick={addPrescriptionLine} className="w-full py-2.5 border border-dashed border-emerald-500/30 text-emerald-400 rounded-xl text-sm font-medium hover:bg-emerald-500/5 transition-colors flex items-center justify-center gap-2">
                   <Plus className="w-4 h-4" /> Ajouter un médicament
                 </button>
 
-                {/* Note générale */}
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">Note / Recommandations</label>
                   <textarea
@@ -734,13 +780,20 @@ const DoctorDashboard: React.FC = () => {
                   />
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button onClick={() => setShowPrescription(false)} className="flex-1 py-3 bg-white/5 border border-white/10 text-gray-300 rounded-xl font-semibold hover:bg-white/10 transition-colors">
                     Annuler
                   </button>
-                  <button onClick={sendPrescription} className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all">
-                    <Send className="w-4 h-4" /> Envoyer l'ordonnance
+                  <button
+                    onClick={sendPrescription}
+                    disabled={prescriptionLoading}
+                    className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {prescriptionLoading ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <><Send className="w-4 h-4" /> Envoyer l'ordonnance</>
+                    )}
                   </button>
                 </div>
               </div>
@@ -749,14 +802,11 @@ const DoctorDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════════
-          MODAL APPEL VIDÉO
-      ══════════════════════════════════════════════════════════════════════════ */}
+      {/* ══════════════════ MODAL APPEL VIDÉO ══════════════════ */}
       {showVideoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) setShowVideoModal(false); }}>
           <div className="w-full max-w-md bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
 
-            {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-white/10 bg-gradient-to-r from-blue-500/10 to-cyan-500/10">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/20 rounded-xl"><Video className="w-5 h-5 text-blue-400" /></div>
@@ -771,7 +821,6 @@ const DoctorDashboard: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Info patient */}
               {videoPatient && (
                 <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/10">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
@@ -784,40 +833,40 @@ const DoctorDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Lien */}
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Lien de la salle de réunion</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={videoLink}
-                    onChange={e => setVideoLink(e.target.value)}
-                    className="flex-1 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500/50"
-                  />
-                </div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Lien de la salle</label>
+                <input
+                  type="text"
+                  value={videoLink}
+                  onChange={e => setVideoLink(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500/50"
+                />
                 <p className="text-gray-500 text-xs mt-1.5">
-                  Propulsé par <span className="text-blue-400">Jitsi Meet</span> – gratuit, sans inscription
+                  Propulsé par <span className="text-blue-400">Jitsi Meet</span> — le lien sera enregistré dans le dossier du patient
                 </p>
               </div>
 
-              {/* Avertissement */}
               <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
                 <AlertCircle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
                 <p className="text-yellow-300 text-xs">
-                  Partagez ce lien avec votre patient avant l'appel. Il pourra rejoindre sans créer de compte.
+                  L'appel sera enregistré dans le dossier médical du patient avec le lien pour qu'il puisse rejoindre.
                 </p>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3">
                 <button onClick={() => setShowVideoModal(false)} className="flex-1 py-3 bg-white/5 border border-white/10 text-gray-300 rounded-xl font-semibold hover:bg-white/10 transition-colors">
                   Annuler
                 </button>
                 <button
                   onClick={startVideoCall}
-                  className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-105"
+                  disabled={videoLoading}
+                  className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Video className="w-4 h-4" /> Lancer l'appel
+                  {videoLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <><Video className="w-4 h-4" /> Lancer l'appel</>
+                  )}
                 </button>
               </div>
             </div>
