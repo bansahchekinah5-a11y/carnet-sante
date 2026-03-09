@@ -754,15 +754,21 @@ const PatientDashboard: React.FC = () => {
                                 appointment.type === 'home_visit' ? 'Visite à domicile' : 'En personne'}
                         </p>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex flex-col items-end gap-2">
                         <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusClass(computed)}`}>
                           {getStatusText(computed)}
                         </span>
                         <Link
                           to={`/appointments/${appointment.id}`}
-                          className="text-blue-400 hover:text-blue-300 text-sm font-medium transition"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                            computed === 'completed'
+                              ? 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                              : computed === 'ongoing'
+                              ? 'bg-blue-400/20 text-blue-200 border-blue-400/30 hover:bg-blue-400/30 animate-pulse'
+                              : 'text-blue-400 border-transparent hover:text-blue-300'
+                          }`}
                         >
-                          Détails →
+                          {computed === 'ongoing' ? '▶ En cours' : '👁 Voir détail'}
                         </Link>
                       </div>
                     </div>
