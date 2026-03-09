@@ -184,7 +184,6 @@ const DoctorDashboard: React.FC = () => {
     setPrescriptionLines(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
   };
 
-  // ✅ CORRIGÉ : appel API réel au lieu de la simulation
   const sendPrescription = async () => {
     const valid = prescriptionLines.every(l => l.medication.trim() && l.dosage.trim());
     if (!valid) {
@@ -196,7 +195,6 @@ const DoctorDashboard: React.FC = () => {
     try {
       setPrescriptionLoading(true);
 
-      // Formater les médicaments pour l'API
       const medications = prescriptionLines.map(l => ({
         medication:   l.medication.trim(),
         dosage:       l.dosage.trim(),
@@ -205,7 +203,6 @@ const DoctorDashboard: React.FC = () => {
         instructions: l.instructions.trim() || undefined
       }));
 
-      // ✅ Appel API réel → POST /api/prescriptions
       await medicalFileService.createPrescription({
         patientId:     prescriptionPatient.id,
         appointmentId: prescriptionAppointmentId || undefined,
@@ -241,14 +238,12 @@ const DoctorDashboard: React.FC = () => {
     setShowVideoModal(true);
   };
 
-  // ✅ CORRIGÉ : sauvegarde en BDD puis ouvre le lien
   const startVideoCall = async () => {
     if (!videoPatient || !videoLink) return;
 
     try {
       setVideoLoading(true);
 
-      // ✅ Appel API réel → POST /api/video-calls
       await medicalFileService.createVideoCall({
         patientId:     videoPatient.id,
         appointmentId: videoAppointmentId || undefined,
@@ -256,7 +251,6 @@ const DoctorDashboard: React.FC = () => {
         notes:         `Téléconsultation avec Dr. ${doctorUser?.lastName}`,
       });
 
-      // Ouvrir la salle vidéo
       window.open(videoLink, '_blank');
 
       showNotification(
@@ -508,20 +502,27 @@ const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* RENDEZ-VOUS + ACTIONS RAPIDES */}
+      {/* RENDEZ-VOUS AVEC LA MÊME DISPOSITION QUE LES ORDONNANCES */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 futuristic-card p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="p-2.5 bg-blue-500/20 rounded-xl">
               <Calendar className="w-6 h-6 text-blue-400" />
-              Demandes de rendez-vous
-            </h3>
-            <div className="flex gap-2 p-1 bg-white/5 backdrop-blur-md rounded-xl border border-white/10">
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Demandes de rendez-vous</h3>
+              <p className="text-gray-400 text-sm">Gérez les demandes en attente, aujourd'hui et à venir</p>
+            </div>
+          </div>
+
+          {/* Filtres + Barre de recherche */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-5">
+            <div className="flex gap-1 p-1 bg-white/5 backdrop-blur-md rounded-xl border border-white/10">
               {(['pending', 'today', 'upcoming'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 whitespace-nowrap ${
                     filter === f
                       ? f === 'pending'  ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg'
                       : f === 'today'    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg'
@@ -534,6 +535,17 @@ const DoctorDashboard: React.FC = () => {
                    : 'À venir'}
                 </button>
               ))}
+            </div>
+            
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Rechercher un patient..."
+                value={searchPatient}
+                onChange={e => setSearchPatient(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 text-sm"
+              />
             </div>
           </div>
 
@@ -548,71 +560,122 @@ const DoctorDashboard: React.FC = () => {
               <p className="text-gray-400">Aucune demande de rendez-vous</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredAppointments.map(apt => {
-                const { date, time, day } = formatDateTime(apt.appointmentDate);
-                return (
-                  <div key={apt.id} className={`futuristic-card p-5 transition-all duration-300 hover:border-white/30 ${apt.status === 'pending' ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-green-500/50 bg-green-500/5'}`}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                            <span className="text-white font-bold text-lg">{apt.patient?.firstName?.[0]}{apt.patient?.lastName?.[0]}</span>
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+              {filteredAppointments
+                .filter(apt => 
+                  !searchPatient || 
+                  `${apt.patient?.firstName} ${apt.patient?.lastName}`.toLowerCase().includes(searchPatient.toLowerCase())
+                )
+                .map(apt => {
+                  const { date, time, day } = formatDateTime(apt.appointmentDate);
+                  return (
+                    <div key={apt.id} className={`p-4 bg-white/5 border rounded-xl hover:bg-white/10 transition-all ${
+                      apt.status === 'pending' 
+                        ? 'border-yellow-500/30 hover:border-yellow-500/50' 
+                        : apt.status === 'confirmed' 
+                        ? 'border-green-500/30 hover:border-green-500/50'
+                        : 'border-white/10 hover:border-white/30'
+                    }`}>
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Informations patient */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shrink-0">
+                              <span className="text-white text-xs font-bold">
+                                {apt.patient?.firstName?.[0]}{apt.patient?.lastName?.[0]}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-white font-medium text-sm truncate">
+                                {apt.patient?.firstName} {apt.patient?.lastName}
+                              </p>
+                              <p className="text-gray-500 text-xs truncate">
+                                {apt.patient?.phoneNumber || 'Tél. non renseigné'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="font-bold text-white text-lg">{apt.patient?.firstName} {apt.patient?.lastName}</h3>
-                            <p className="text-sm text-gray-400">{apt.patient?.phoneNumber || 'Tél. non renseigné'}</p>
+
+                          {/* Date et Heure */}
+                          <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div className="bg-white/5 rounded-lg p-2">
+                              <p className="text-xs text-gray-400 mb-1">Date</p>
+                              <p className="text-white text-sm font-semibold capitalize truncate">{day}</p>
+                              <p className="text-gray-300 text-xs">{date}</p>
+                            </div>
+                            <div className="bg-white/5 rounded-lg p-2">
+                              <p className="text-xs text-gray-400 mb-1">Heure</p>
+                              <p className="text-white text-sm font-semibold">{time}</p>
+                              <p className="text-gray-300 text-xs">{apt.duration} min</p>
+                            </div>
                           </div>
+
+                          {/* Motif */}
+                          <div className="bg-white/5 rounded-lg p-2 mb-2">
+                            <p className="text-xs text-gray-400 mb-1">Motif</p>
+                            <p className="text-white text-sm truncate">{apt.reason}</p>
+                          </div>
+
+                          {/* Badge statut */}
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                            apt.status === 'pending' 
+                              ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                              : apt.status === 'confirmed'
+                              ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                              : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          }`}>
+                            {apt.status === 'pending' ? '⏳ En attente' : 
+                             apt.status === 'confirmed' ? '✅ Confirmé' : 
+                             apt.status}
+                          </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div className="bg-white/5 rounded-lg p-3">
-                            <p className="text-xs text-gray-400 mb-1">Date</p>
-                            <p className="font-semibold text-white capitalize">{day}</p>
-                            <p className="text-sm text-gray-300">{date}</p>
-                          </div>
-                          <div className="bg-white/5 rounded-lg p-3">
-                            <p className="text-xs text-gray-400 mb-1">Heure</p>
-                            <p className="font-semibold text-white text-lg">{time}</p>
-                          </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-col gap-2 shrink-0">
+                          {apt.status === 'pending' && (
+                            <>
+                              <button 
+                                onClick={() => handleConfirmAppointment(apt.id)} 
+                                className="px-3 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                                title="Confirmer le rendez-vous"
+                              >
+                                <Check className="w-3 h-3" /> Confirmer
+                              </button>
+                              <button 
+                                onClick={() => handleCancelAppointment(apt.id)} 
+                                className="px-3 py-1.5 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                                title="Refuser le rendez-vous"
+                              >
+                                <X className="w-3 h-3" /> Refuser
+                              </button>
+                            </>
+                          )}
+                          {apt.status === 'confirmed' && (
+                            <>
+                              <button 
+                                onClick={() => openPrescription(apt.patient, apt.id)} 
+                                className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-semibold hover:bg-emerald-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                              >
+                                <FileText className="w-3 h-3" /> Ordonnance
+                              </button>
+                              <button 
+                                onClick={() => openVideoModal(apt.patient, apt.id)} 
+                                className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-semibold hover:bg-blue-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                              >
+                                <Video className="w-3 h-3" /> Appel vidéo
+                              </button>
+                              <Link 
+                                to={`/appointments/${apt.id}`} 
+                                className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg text-xs font-semibold hover:from-blue-600 hover:to-cyan-700 transition-all flex items-center gap-1.5 shadow-lg whitespace-nowrap"
+                              >
+                                Détails <ChevronRight className="w-3 h-3" />
+                              </Link>
+                            </>
+                          )}
                         </div>
-                        <div className="bg-white/5 rounded-lg p-3 mb-3">
-                          <p className="text-xs text-gray-400 mb-1">Motif</p>
-                          <p className="text-white">{apt.reason}</p>
-                        </div>
-                        <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold ${apt.status === 'pending' ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30' : 'bg-green-500/20 text-green-300 border border-green-500/30'}`}>
-                          {apt.status === 'pending' ? '⏳ En attente' : '✅ Confirmé'}
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-3 ml-6">
-                        {apt.status === 'pending' && (
-                          <>
-                            <button onClick={() => handleConfirmAppointment(apt.id)} className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg transition-all hover:scale-105">
-                              <Check className="w-4 h-4" /> Confirmer
-                            </button>
-                            <button onClick={() => handleCancelAppointment(apt.id)} className="px-5 py-2.5 bg-white/10 border border-red-400/50 text-red-300 hover:bg-red-500/20 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all hover:scale-105">
-                              <X className="w-4 h-4" /> Refuser
-                            </button>
-                          </>
-                        )}
-                        {apt.status === 'confirmed' && (
-                          <>
-                            {/* ✅ On passe l'appointmentId pour lier la prescription au RDV */}
-                            <button onClick={() => openPrescription(apt.patient, apt.id)} className="px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-500/30 transition-all">
-                              <FileText className="w-3.5 h-3.5" /> Ordonnance
-                            </button>
-                            <button onClick={() => openVideoModal(apt.patient, apt.id)} className="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 hover:bg-blue-500/30 transition-all">
-                              <Video className="w-3.5 h-3.5" /> Appel vidéo
-                            </button>
-                            <Link to={`/appointments/${apt.id}`} className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg transition-all hover:scale-105">
-                              Voir détails <ChevronRight className="w-3.5 h-3.5" />
-                            </Link>
-                          </>
-                        )}
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
         </div>
@@ -626,21 +689,27 @@ const DoctorDashboard: React.FC = () => {
           <div className="space-y-3">
             <Link to="/doctor/calendar" className="w-full text-left p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 hover:border-white/20 transition-all group flex items-center justify-between">
               <div className="flex items-center">
-                <div className="p-2 bg-blue-500/20 rounded-lg mr-3 group-hover:bg-blue-500/30 transition-colors"><Calendar className="h-5 w-5 text-blue-400" /></div>
+                <div className="p-2 bg-blue-500/20 rounded-lg mr-3 group-hover:bg-blue-500/30 transition-colors">
+                  <Calendar className="h-5 w-5 text-blue-400" />
+                </div>
                 <span className="text-white font-medium">Gérer mes disponibilités</span>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
             </Link>
             <Link to="/doctor/patients" className="w-full text-left p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 hover:border-white/20 transition-all group flex items-center justify-between">
               <div className="flex items-center">
-                <div className="p-2 bg-purple-500/20 rounded-lg mr-3 group-hover:bg-purple-500/30 transition-colors"><Users className="h-5 w-5 text-purple-400" /></div>
+                <div className="p-2 bg-purple-500/20 rounded-lg mr-3 group-hover:bg-purple-500/30 transition-colors">
+                  <Users className="h-5 w-5 text-purple-400" />
+                </div>
                 <span className="text-white font-medium">Voir mes patients</span>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
             </Link>
             <Link to="/doctor/appointments" className="w-full text-left p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 hover:border-white/20 transition-all group flex items-center justify-between">
               <div className="flex items-center">
-                <div className="p-2 bg-green-500/20 rounded-lg mr-3 group-hover:bg-green-500/30 transition-colors"><Calendar className="h-5 w-5 text-green-400" /></div>
+                <div className="p-2 bg-green-500/20 rounded-lg mr-3 group-hover:bg-green-500/30 transition-colors">
+                  <Calendar className="h-5 w-5 text-green-400" />
+                </div>
                 <span className="text-white font-medium">Tous les rendez-vous</span>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
@@ -654,18 +723,22 @@ const DoctorDashboard: React.FC = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                 <span className="text-gray-300 text-sm">En attente</span>
-                <span className="font-bold text-yellow-400 text-lg">{appointments.filter(a => a.status === 'pending').length}</span>
+                <span className="font-bold text-yellow-400 text-lg">
+                  {appointments.filter(a => a.status === 'pending').length}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                 <span className="text-gray-300 text-sm">Confirmés aujourd'hui</span>
                 <span className="font-bold text-green-400 text-lg">
-                  {appointments.filter(a => a.status === 'confirmed' && new Date(a.appointmentDate).toDateString() === new Date().toDateString()).length}
+                  {appointments.filter(a => a.status === 'confirmed' && 
+                    new Date(a.appointmentDate).toDateString() === new Date().toDateString()).length}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                 <span className="text-gray-300 text-sm">Taux de confirmation</span>
                 <span className="font-bold text-blue-400 text-lg">
-                  {appointments.length > 0 ? Math.round((appointments.filter(a => a.status === 'confirmed').length / appointments.length) * 100) : 0}%
+                  {appointments.length > 0 ? 
+                    Math.round((appointments.filter(a => a.status === 'confirmed').length / appointments.length) * 100) : 0}%
                 </span>
               </div>
             </div>
