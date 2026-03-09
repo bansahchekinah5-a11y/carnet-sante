@@ -289,7 +289,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
           </div>
 
           <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-            {/* Barre de recherche */}
+            {/* Barre de recherche - CORRIGÉE */}
             <div className="relative flex-1 min-w-[250px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -297,7 +297,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                 placeholder={`Rechercher ${userType === 'doctor' ? 'un médecin' : userType === 'patient' ? 'un patient' : '...'}`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm bg-white text-gray-900"
               />
             </div>
 
@@ -305,7 +305,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
             <div className="relative">
               <button
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
-                className="px-4 py-2.5 bg-gradient-to-r from-gray-100 to-gray-50 border border-gray-300 rounded-lg hover:from-gray-200 hover:to-gray-100 transition-all flex items-center gap-2 shadow-sm hover:shadow-md"
+                className="px-4 py-2.5 bg-gradient-to-r from-gray-100 to-gray-50 border border-gray-300 rounded-lg hover:from-gray-200 hover:to-gray-100 transition-all flex items-center gap-2 shadow-sm hover:shadow-md text-gray-900"
               >
                 <Filter className="w-4 h-4 text-gray-600" />
                 <span className="text-gray-700 font-medium">Filtres</span>
@@ -547,7 +547,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
         )}
       </div>
 
-      {/* Modal création/édition */}
+      {/* Modal création/édition - INPUTS CORRIGÉS */}
       {showUserModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -588,7 +588,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                       value={formData.firstName}
                       onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                       disabled={!isEditing && !isCreating}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                     />
                   </div>
                   <div>
@@ -598,7 +598,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                       value={formData.lastName}
                       onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                       disabled={!isEditing && !isCreating}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                     />
                   </div>
                 </div>
@@ -618,7 +618,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       disabled={!isEditing && !isCreating}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                     />
                   </div>
                   <div>
@@ -628,7 +628,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                       value={formData.phoneNumber}
                       onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                       disabled={!isEditing && !isCreating}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                     />
                   </div>
                 </div>
@@ -649,7 +649,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                       type="password"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     />
                   </div>
                 </div>
@@ -669,7 +669,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                       value={formData.dateOfBirth}
                       onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                       disabled={!isEditing && !isCreating}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                     />
                   </div>
                   <div>
@@ -678,7 +678,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                       disabled={!isEditing && !isCreating}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                     >
                       <option value="">Non spécifié</option>
                       <option value="M">Masculin</option>
@@ -704,7 +704,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                           value={formData.specialty}
                           onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
                           disabled={!isEditing && !isCreating}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                         />
                       </div>
                       <div>
@@ -714,7 +714,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                           value={formData.licenseNumber}
                           onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
                           disabled={!isEditing && !isCreating}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                         />
                       </div>
                     </div>
@@ -725,7 +725,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                         onChange={(e) => setFormData({ ...formData, biography: e.target.value })}
                         disabled={!isEditing && !isCreating}
                         rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                       />
                     </div>
                     <div>
@@ -735,7 +735,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ userType }) => {
                         value={formData.consultationPrice}
                         onChange={(e) => setFormData({ ...formData, consultationPrice: parseInt(e.target.value) })}
                         disabled={!isEditing && !isCreating}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 bg-white text-gray-900"
                       />
                     </div>
                   </div>
