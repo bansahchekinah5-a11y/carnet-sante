@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  BookOpen, 
-  ArrowLeft, 
-  Code, 
+import {
+  BookOpen,
+  ArrowLeft,
+  Code,
   Users,
   Shield,
   Zap,
@@ -17,89 +17,95 @@ import {
 const DocumentationPage: React.FC = () => {
   const sections = [
     {
-      title: "Guide utilisateur",
+      title: 'Guide utilisateur',
+      slug: 'user-guide',
       icon: <Users className="w-5 h-5" />,
-      color: "bg-blue-100",
-      textColor: "text-blue-600",
-      description: "Apprenez à utiliser toutes les fonctionnalités de la plateforme",
+      color: 'bg-blue-100',
+      textColor: 'text-blue-600',
+      description: 'Apprenez à utiliser toutes les fonctionnalités de la plateforme',
       links: [
-        "Premiers pas",
-        "Gestion des rendez-vous",
-        "Dossier médical",
-        "Téléconsultation",
-        "Profil et préférences"
-      ]
+        { label: 'Premiers pas',               slug: 'user-guide'   },
+        { label: 'Gestion des rendez-vous',    slug: 'user-guide'   },
+        { label: 'Dossier médical',            slug: 'user-guide'   },
+        { label: 'Téléconsultation',           slug: 'user-guide'   },
+        { label: 'Profil et préférences',      slug: 'user-guide'   },
+      ],
     },
     {
-      title: "Guide médecin",
+      title: 'Guide médecin',
+      slug: 'doctor-guide',
       icon: <Code className="w-5 h-5" />,
-      color: "bg-purple-100",
-      textColor: "text-purple-600",
-      description: "Configurez votre compte et gérez vos patients",
+      color: 'bg-purple-100',
+      textColor: 'text-purple-600',
+      description: 'Configurez votre compte et gérez vos patients',
       links: [
-        "Configuration du compte",
-        "Gestion des patients",
-        "Calendrier et disponibilités",
-        "Téléconsultation",
-        "Facturation"
-      ]
+        { label: 'Configuration du compte',   slug: 'doctor-guide' },
+        { label: 'Gestion des patients',       slug: 'doctor-guide' },
+        { label: 'Calendrier et disponibilités', slug: 'doctor-guide' },
+        { label: 'Téléconsultation',           slug: 'doctor-guide' },
+        { label: 'Facturation',                slug: 'doctor-guide' },
+      ],
     },
     {
-      title: "API Documentation",
+      title: 'API Documentation',
+      slug: 'api',
       icon: <Server className="w-5 h-5" />,
-      color: "bg-emerald-100",
-      textColor: "text-emerald-600",
-      description: "Intégrez notre API dans vos applications",
+      color: 'bg-emerald-100',
+      textColor: 'text-emerald-600',
+      description: 'Intégrez notre API dans vos applications',
       links: [
-        "Authentification",
-        "Endpoints",
-        "Webhooks",
-        "Rate limiting",
-        "Exemples de code"
-      ]
+        { label: 'Authentification',           slug: 'api' },
+        { label: 'Endpoints',                  slug: 'api' },
+        { label: 'Webhooks',                   slug: 'api' },
+        { label: 'Rate limiting',              slug: 'api' },
+        { label: 'Exemples de code',           slug: 'api' },
+      ],
     },
     {
-      title: "Sécurité",
+      title: 'Sécurité',
+      slug: 'security',
       icon: <Lock className="w-5 h-5" />,
-      color: "bg-red-100",
-      textColor: "text-red-600",
-      description: "Comprendre nos mesures de sécurité",
+      color: 'bg-red-100',
+      textColor: 'text-red-600',
+      description: 'Comprendre nos mesures de sécurité',
       links: [
-        "Chiffrement des données",
-        "RGPD",
-        "Politique de confidentialité",
-        "Journalisation",
-        "Certifications"
-      ]
+        { label: 'Chiffrement des données',    slug: 'security' },
+        { label: 'RGPD',                       slug: 'security' },
+        { label: 'Politique de confidentialité', slug: 'security' },
+        { label: 'Journalisation',             slug: 'security' },
+        { label: 'Certifications',             slug: 'security' },
+      ],
     },
     {
-      title: "Applications mobiles",
+      title: 'Applications mobiles',
+      slug: 'mobile',
       icon: <Smartphone className="w-5 h-5" />,
-      color: "bg-orange-100",
-      textColor: "text-orange-600",
-      description: "Utilisez nos applications iOS et Android",
+      color: 'bg-orange-100',
+      textColor: 'text-orange-600',
+      description: 'Utilisez nos applications iOS et Android',
       links: [
-        "iOS",
-        "Android",
-        "Installation",
-        "Mise à jour",
-        "Dépannage"
-      ]
+        { label: 'iOS',                        slug: 'mobile' },
+        { label: 'Android',                    slug: 'mobile' },
+        { label: 'Installation',               slug: 'mobile' },
+        { label: 'Mise à jour',                slug: 'mobile' },
+        { label: 'Dépannage',                  slug: 'mobile' },
+      ],
     },
     {
-      title: "Intégration",
+      title: 'Intégration',
+      slug: 'integration',
       icon: <Globe className="w-5 h-5" />,
-      color: "bg-indigo-100",
-      textColor: "text-indigo-600",
-      description: "Intégrez nos services dans votre système",
+      color: 'bg-indigo-100',
+      textColor: 'text-indigo-600',
+      description: 'Intégrez nos services dans votre système',
       links: [
-        "Systèmes de santé",
-        "Dossier patient",
-        "Paiements",
-        "Notifications",
-        "Calendriers"
-      ]
-    }
+        { label: 'Systèmes de santé',          slug: 'integration' },
+        { label: 'Dossier patient',            slug: 'integration' },
+        { label: 'Paiements',                  slug: 'integration' },
+        { label: 'Notifications',              slug: 'integration' },
+        { label: 'Calendriers',                slug: 'integration' },
+      ],
+    },
   ];
 
   return (
@@ -138,7 +144,7 @@ const DocumentationPage: React.FC = () => {
           {sections.map((section, index) => (
             <div
               key={index}
-              className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all border border-gray-200 overflow-hidden group cursor-pointer"
+              className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all border border-gray-200 overflow-hidden group"
             >
               <div className="p-6">
                 <div className="flex items-center gap-3 mb-4">
@@ -154,19 +160,29 @@ const DocumentationPage: React.FC = () => {
                   {section.description}
                 </p>
 
+                {/* Liens cliquables vers la page de la section */}
                 <ul className="space-y-2">
                   {section.links.slice(0, 3).map((link, idx) => (
-                    <li key={idx} className="text-sm text-gray-600 hover:text-blue-600 transition-colors flex items-center gap-2">
-                      <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                      {link}
+                    <li key={idx}>
+                      <Link
+                        to={`/docs/${link.slug}`}
+                        className="text-sm text-gray-600 hover:text-blue-600 transition-colors flex items-center gap-2 group/link"
+                      >
+                        <span className="w-1 h-1 bg-gray-300 group-hover/link:bg-blue-400 rounded-full transition-colors shrink-0"></span>
+                        {link.label}
+                      </Link>
                     </li>
                   ))}
                 </ul>
 
-                <div className="mt-4 flex items-center text-sm text-blue-600 group-hover:gap-2 transition-all">
+                {/* Bouton "Voir plus" cliquable */}
+                <Link
+                  to={`/docs/${section.slug}`}
+                  className="mt-4 flex items-center gap-1 text-sm text-blue-600 hover:gap-2 transition-all font-medium"
+                >
                   <span>Voir plus</span>
                   <ChevronRight className="w-4 h-4" />
-                </div>
+                </Link>
               </div>
             </div>
           ))}
@@ -181,21 +197,18 @@ const DocumentationPage: React.FC = () => {
             <h2 className="text-2xl font-bold text-white">Démarrage rapide</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white/10 rounded-xl p-4 backdrop-blur">
-              <div className="text-2xl font-bold text-white mb-2">1.</div>
-              <h3 className="font-semibold text-white mb-1">Créez un compte</h3>
-              <p className="text-sm text-white/80">Inscrivez-vous gratuitement en quelques clics</p>
-            </div>
-            <div className="bg-white/10 rounded-xl p-4 backdrop-blur">
-              <div className="text-2xl font-bold text-white mb-2">2.</div>
-              <h3 className="font-semibold text-white mb-1">Configurez votre profil</h3>
-              <p className="text-sm text-white/80">Renseignez vos informations personnelles</p>
-            </div>
-            <div className="bg-white/10 rounded-xl p-4 backdrop-blur">
-              <div className="text-2xl font-bold text-white mb-2">3.</div>
-              <h3 className="font-semibold text-white mb-1">Commencez à utiliser</h3>
-              <p className="text-sm text-white/80">Prenez vos premiers rendez-vous</p>
-            </div>
+            {[
+              { n: '1.', title: 'Créez un compte', desc: 'Inscrivez-vous gratuitement en quelques clics', to: '/register' },
+              { n: '2.', title: 'Configurez votre profil', desc: 'Renseignez vos informations personnelles', to: '/docs/user-guide' },
+              { n: '3.', title: 'Commencez à utiliser', desc: 'Prenez vos premiers rendez-vous', to: '/docs/user-guide' },
+            ].map(({ n, title, desc, to }) => (
+              <Link key={n} to={to}
+                className="bg-white/10 hover:bg-white/20 rounded-xl p-4 backdrop-blur transition-all group">
+                <div className="text-2xl font-bold text-white mb-2">{n}</div>
+                <h3 className="font-semibold text-white mb-1 group-hover:underline">{title}</h3>
+                <p className="text-sm text-white/80">{desc}</p>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
