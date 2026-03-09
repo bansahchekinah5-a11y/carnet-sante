@@ -676,7 +676,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
                   <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3"/>
                   <p className="text-gray-500 font-medium">Aucun rendez-vous trouvé</p>
-                  <p className="text-xs text-gray-400 mt-1">{appointments.length===0?'Les rendez-vous apparaîtront ici dès qu'un patient prendra rendez-vous':'Aucun résultat pour ce filtre'}</p>
+                  <p className="text-xs text-gray-400 mt-1">{appointments.length===0?"Les rendez-vous apparaîtront ici dès qu'un patient prendra rendez-vous":"Aucun résultat pour ce filtre"}</p>
                 </div>
               ) : (
               <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
