@@ -30,7 +30,7 @@ interface Appointment {
   doctor: { firstName: string; lastName: string; specialty: string };
   appointmentDate: string;
   duration: number;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+  status: 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled' | 'no_show' | 'missed';
   type: 'in_person' | 'teleconsultation' | 'home_visit';
   reason: string;
 }
@@ -39,11 +39,11 @@ const PatientDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout, updateProfilePicture } = useAuth();
   const { showNotification } = useNotification();
-  
+
   // États pour l'upload de photo
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
@@ -63,10 +63,10 @@ const PatientDashboard: React.FC = () => {
     type: 'in_person' as 'in_person' | 'teleconsultation' | 'home_visit',
     symptoms: ''
   });
-  const [cardInfo, setCardInfo] = useState({ 
-    number: '', 
-    date: '', 
-    cvv: '' 
+  const [cardInfo, setCardInfo] = useState({
+    number: '',
+    date: '',
+    cvv: ''
   });
 
   const medicalSummary = {
@@ -74,6 +74,45 @@ const PatientDashboard: React.FC = () => {
     medications: 3,
     conditions: 1,
   };
+
+  // ── 🕐 Horloge — recalcule les statuts toutes les 30s ─────────────────────
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const getComputedStatus = (dbStatus: string, appointmentDate: string, duration: number = 30): string => {
+    if (['cancelled', 'no_show', 'missed', 'completed'].includes(dbStatus)) return dbStatus;
+    const start = new Date(appointmentDate).getTime();
+    const end   = start + duration * 60 * 1000;
+    const t     = now.getTime();
+    if (dbStatus === 'confirmed' || dbStatus === 'ongoing') {
+      if (t >= end)   return 'completed';
+      if (t >= start) return 'ongoing';
+    }
+    return dbStatus;
+  };
+
+  const getStatusText = (status: string): string => ({
+    pending:   '⏳ En attente',
+    confirmed: '✅ Confirmé',
+    ongoing:   '🔵 En cours',
+    completed: '☑️ Terminé',
+    cancelled: '❌ Annulé',
+    no_show:   '👻 Non honoré',
+    missed:    '⚠️ Manqué',
+  }[status] ?? status);
+
+  const getStatusClass = (status: string): string => ({
+    pending:   'bg-blue-500/20   text-blue-300   border border-blue-500/30',
+    confirmed: 'bg-green-500/20  text-green-300  border border-green-500/30',
+    ongoing:   'bg-blue-400/30   text-blue-100   border border-blue-300/50 animate-pulse',
+    completed: 'bg-gray-500/20   text-gray-300   border border-gray-500/30',
+    cancelled: 'bg-red-500/20    text-red-300    border border-red-500/30',
+    no_show:   'bg-orange-500/20 text-orange-300 border border-orange-500/30',
+    missed:    'bg-red-700/20    text-red-400    border border-red-700/30',
+  }[status] ?? 'bg-blue-500/20 text-blue-300 border border-blue-500/30');
 
   const generateDates = () => {
     const dates = [];
@@ -131,12 +170,12 @@ const PatientDashboard: React.FC = () => {
 
     try {
       setUploading(true);
-      
+
       const token = localStorage.getItem('token');
       const API_URL = import.meta.env.VITE_API_URL || 'https://carnet-sante-backend.onrender.com/api';
 
       console.log('📸 Upload de la photo...');
-      
+
       const response = await fetch(`${API_URL}/profile/picture`, {
         method: 'POST',
         headers: {
@@ -178,19 +217,19 @@ const PatientDashboard: React.FC = () => {
       console.log('🔄 Chargement des rendez-vous depuis le service...');
       const appointments = await appointmentService.getAppointments();
       console.log('📋 Rendez-vous reçus du service:', appointments);
-      
+
       if (!appointments || !Array.isArray(appointments)) {
         console.warn('⚠️ Les rendez-vous ne sont pas un tableau:', appointments);
         setUpcomingAppointments([]);
         return;
       }
-      
+
       if (appointments.length === 0) {
         console.log('ℹ️ Aucun rendez-vous trouvé');
         setUpcomingAppointments([]);
         return;
       }
-      
+
       const transformedAppointments: Appointment[] = appointments.map((apt: any, index: number) => {
         return {
           id: apt.id || `temp-${index}`,
@@ -206,7 +245,7 @@ const PatientDashboard: React.FC = () => {
           reason: apt.reason || 'Consultation médicale'
         };
       });
-      
+
       console.log('🔄 Filtrage des rendez-vous à venir...');
       const now = new Date();
       const upcoming = transformedAppointments.filter(apt => {
@@ -221,7 +260,7 @@ const PatientDashboard: React.FC = () => {
           return false;
         }
       });
-      
+
       console.log('✅ Rendez-vous à venir filtrés:', upcoming);
       setUpcomingAppointments(upcoming);
     } catch (err) {
@@ -244,7 +283,7 @@ const PatientDashboard: React.FC = () => {
         console.log('🔄 Chargement des médecins...');
         const doctorsData = await appointmentService.getDoctors();
         console.log('👨‍⚕️ Médecins reçus:', doctorsData);
-        
+
         const fetchedDoctors: Doctor[] = doctorsData.map((d: any) => ({
           id: d.id,
           firstName: d.firstName,
@@ -254,7 +293,7 @@ const PatientDashboard: React.FC = () => {
           availableSlots: d.availableSlots || ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
           consultationPrice: d.consultationPrice || 50
         }));
-        
+
         setDoctors(fetchedDoctors);
         setCalendars([]);
         await fetchAppointments();
@@ -262,30 +301,30 @@ const PatientDashboard: React.FC = () => {
         console.error('❌ Erreur lors de la récupération des données:', err);
         setError('Impossible de charger les données. Utilisation des données de secours.');
         const mockDoctors: Doctor[] = [
-          { 
-            id: '1', 
-            firstName: 'Marie', 
-            lastName: 'Dubois', 
-            specialty: 'Cardiologie', 
-            available: true, 
+          {
+            id: '1',
+            firstName: 'Marie',
+            lastName: 'Dubois',
+            specialty: 'Cardiologie',
+            available: true,
             availableSlots: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
             consultationPrice: 60
           },
-          { 
-            id: '2', 
-            firstName: 'Pierre', 
-            lastName: 'Martin', 
-            specialty: 'Dermatologie', 
-            available: true, 
+          {
+            id: '2',
+            firstName: 'Pierre',
+            lastName: 'Martin',
+            specialty: 'Dermatologie',
+            available: true,
             availableSlots: ['10:30', '14:00', '16:00'],
             consultationPrice: 55
           },
-          { 
-            id: '3', 
-            firstName: 'Sophie', 
-            lastName: 'Laurent', 
-            specialty: 'Neurologie', 
-            available: false, 
+          {
+            id: '3',
+            firstName: 'Sophie',
+            lastName: 'Laurent',
+            specialty: 'Neurologie',
+            available: false,
             availableSlots: [],
             consultationPrice: 70
           },
@@ -303,11 +342,11 @@ const PatientDashboard: React.FC = () => {
   const formatAppointmentDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('fr-FR', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      return date.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       });
     } catch {
       return 'Date invalide';
@@ -321,30 +360,6 @@ const PatientDashboard: React.FC = () => {
     } catch {
       return 'Heure invalide';
     }
-  };
-
-  const getStatusText = (status: string) => {
-    const statusMap = {
-      confirmed: '✓ Confirmé',
-      pending: '○ En attente',
-      scheduled: '○ Planifié',
-      completed: 'Terminé',
-      cancelled: 'Annulé',
-      no_show: 'Non honoré'
-    };
-    return statusMap[status as keyof typeof statusMap] || status;
-  };
-
-  const getStatusClass = (status: string) => {
-    const classMap = {
-      confirmed: 'bg-green-500/20 text-green-300 border border-green-500/30',
-      pending: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-      scheduled: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-      completed: 'bg-gray-500/20 text-gray-300 border border-gray-500/30',
-      cancelled: 'bg-red-500/20 text-red-300 border border-red-500/30',
-      no_show: 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
-    };
-    return classMap[status as keyof typeof classMap] || classMap.pending;
   };
 
   const handleBookingClick = (doctor: Doctor) => {
@@ -460,18 +475,18 @@ const PatientDashboard: React.FC = () => {
                 </Link>
               </nav>
             </div>
-            
+
             {/* ✅ SECTION MODIFIÉE - Photo de profil et infos utilisateur avec upload */}
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3 relative group">
                 {/* Photo de profil avec upload */}
                 <div className="relative">
-                  <div 
+                  <div
                     onClick={triggerFileInput}
                     className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-lg cursor-pointer hover:opacity-90 transition overflow-hidden"
                   >
                     {user?.profilePicture ? (
-                      <img 
+                      <img
                         src={`${user.profilePicture}?t=${Date.now()}`}
                         alt="Profile"
                         className="w-full h-full object-cover"
@@ -489,7 +504,7 @@ const PatientDashboard: React.FC = () => {
                         {user?.firstName?.[0]}{user?.lastName?.[0]}
                       </span>
                     )}
-                    
+
                     {/* Overlay de chargement */}
                     {uploading && (
                       <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
@@ -497,7 +512,7 @@ const PatientDashboard: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Bouton caméra pour upload */}
                   <button
                     onClick={triggerFileInput}
@@ -507,7 +522,7 @@ const PatientDashboard: React.FC = () => {
                   >
                     <Camera size={12} className="text-white" />
                   </button>
-                  
+
                   {/* Input file caché */}
                   <input
                     ref={fileInputRef}
@@ -518,7 +533,7 @@ const PatientDashboard: React.FC = () => {
                     disabled={uploading}
                   />
                 </div>
-                
+
                 {/* Infos utilisateur */}
                 <div className="hidden sm:block">
                   <p className="text-sm font-medium text-white">
@@ -527,7 +542,7 @@ const PatientDashboard: React.FC = () => {
                   <p className="text-xs text-white/60 capitalize">{user?.role}</p>
                 </div>
               </div>
-              
+
               <button
                 onClick={logout}
                 className="text-white/60 hover:text-white text-sm font-medium transition px-3 py-1 rounded-lg hover:bg-white/10"
@@ -545,7 +560,7 @@ const PatientDashboard: React.FC = () => {
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-lg overflow-hidden border-4 border-white/20">
               {user?.profilePicture ? (
-                <img 
+                <img
                   src={`${user.profilePicture}?t=${Date.now()}`}
                   alt="Profile"
                   className="w-full h-full object-cover"
@@ -564,7 +579,7 @@ const PatientDashboard: React.FC = () => {
                 </span>
               )}
             </div>
-            
+
             {/* Mini bouton pour changer la photo (optionnel) */}
             <button
               onClick={triggerFileInput}
@@ -691,11 +706,24 @@ const PatientDashboard: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {upcomingAppointments.map((appointment) => (
+                {upcomingAppointments.map((appointment) => {
+                  const computed = getComputedStatus(appointment.status, appointment.appointmentDate, appointment.duration);
+                  return (
                   <div
                     key={appointment.id}
-                    className="bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl p-5 transition duration-300 cursor-pointer"
+                    className={`bg-white/5 border rounded-xl p-5 transition duration-300 ${
+                      computed === 'ongoing'
+                        ? 'border-blue-400/50 shadow-lg shadow-blue-500/10'
+                        : 'border-white/10 hover:bg-white/10 hover:border-white/20 cursor-pointer'
+                    }`}
                   >
+                    {/* Bandeau "En cours" */}
+                    {computed === 'ongoing' && (
+                      <div className="flex items-center gap-2 mb-3 px-3 py-1.5 bg-blue-500/20 border border-blue-400/30 rounded-lg">
+                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping shrink-0" />
+                        <span className="text-blue-200 text-xs font-bold tracking-wider uppercase">Consultation en cours</span>
+                      </div>
+                    )}
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
@@ -722,15 +750,13 @@ const PatientDashboard: React.FC = () => {
                           </p>
                         )}
                         <p className="text-white/50 text-xs mt-2">
-                          Type: {appointment.type === 'teleconsultation' ? 'Téléconsultation' : 
+                          Type: {appointment.type === 'teleconsultation' ? 'Téléconsultation' :
                                 appointment.type === 'home_visit' ? 'Visite à domicile' : 'En personne'}
                         </p>
                       </div>
                       <div className="flex items-center space-x-3">
-                        <span
-                          className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusClass(appointment.status)}`}
-                        >
-                          {getStatusText(appointment.status)}
+                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusClass(computed)}`}>
+                          {getStatusText(computed)}
                         </span>
                         <Link
                           to={`/appointments/${appointment.id}`}
@@ -741,7 +767,8 @@ const PatientDashboard: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -775,7 +802,7 @@ const PatientDashboard: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-white/60">Dernière consultation</span>
                   <span className="text-white font-medium">
-                    {upcomingAppointments.length > 0 
+                    {upcomingAppointments.length > 0
                       ? formatAppointmentDate(upcomingAppointments[0].appointmentDate)
                       : 'Aucune'
                     }
@@ -784,7 +811,7 @@ const PatientDashboard: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-white/60">Prochain RDV</span>
                   <span className="text-white font-medium">
-                    {upcomingAppointments.length > 0 
+                    {upcomingAppointments.length > 0
                       ? formatAppointmentDate(upcomingAppointments[0].appointmentDate)
                       : 'Aucun'
                     }
@@ -848,12 +875,12 @@ const PatientDashboard: React.FC = () => {
                         <button onClick={closeBooking} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                           Annuler
                         </button>
-                        <button 
-                          onClick={handleConfirmDoctor} 
+                        <button
+                          onClick={handleConfirmDoctor}
                           disabled={!formData.reason}
                           className={`px-4 py-2 rounded-lg text-white font-semibold ${
-                            formData.reason 
-                              ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer' 
+                            formData.reason
+                              ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
                               : 'bg-gray-400 cursor-not-allowed'
                           }`}
                         >
@@ -918,15 +945,15 @@ const PatientDashboard: React.FC = () => {
                         </div>
                       )}
                       <div className="flex justify-end gap-3">
-                        <button 
-                          onClick={() => setBookingStep(1)} 
+                        <button
+                          onClick={() => setBookingStep(1)}
                           className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                         >
                           Retour
                         </button>
-                        <button 
-                          onClick={handleConfirmTime} 
-                          disabled={!selectedTime} 
+                        <button
+                          onClick={handleConfirmTime}
+                          disabled={!selectedTime}
                           className={`px-4 py-2 rounded-lg text-white font-semibold ${
                             selectedTime ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer' : 'bg-gray-400 cursor-not-allowed'
                           }`}
@@ -994,14 +1021,14 @@ const PatientDashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex justify-end gap-3">
-                        <button 
-                          onClick={() => setBookingStep(2)} 
+                        <button
+                          onClick={() => setBookingStep(2)}
                           className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                         >
                           Retour
                         </button>
-                        <button 
-                          onClick={handlePayment} 
+                        <button
+                          onClick={handlePayment}
                           className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 font-semibold flex items-center gap-2"
                         >
                           <CreditCard size={18} />
