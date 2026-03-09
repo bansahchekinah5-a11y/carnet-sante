@@ -5,23 +5,19 @@ import {
   Building2, 
   Bell, 
   Stethoscope, 
-  Pill, 
-  LineChart,
   Shield,
   ArrowLeft,
   Video,
   Clock,
-  FileText,
-  Users,
-  MessageSquare,
-  CreditCard,
-  Award,
-  CheckCircle2
+  CheckCircle2,
+  ChevronRight,
+  HeartPulse
 } from 'lucide-react';
 
 const FeaturesPage: React.FC = () => {
   const features = [
     {
+      id: 'appointments',
       icon: <Calendar className="w-6 h-6" />,
       title: "Gestion des rendez-vous",
       description: "Prenez, modifiez ou annulez vos rendez-vous en ligne en quelques clics.",
@@ -35,6 +31,7 @@ const FeaturesPage: React.FC = () => {
       ]
     },
     {
+      id: 'medical-record',
       icon: <Building2 className="w-6 h-6" />,
       title: "Dossier médical",
       description: "Accédez à votre dossier médical complet, où que vous soyez.",
@@ -48,6 +45,7 @@ const FeaturesPage: React.FC = () => {
       ]
     },
     {
+      id: 'reminders',
       icon: <Bell className="w-6 h-6" />,
       title: "Rappels intelligents",
       description: "Recevez des notifications pour vos rendez-vous et traitements.",
@@ -61,6 +59,7 @@ const FeaturesPage: React.FC = () => {
       ]
     },
     {
+      id: 'teleconsultation',
       icon: <Video className="w-6 h-6" />,
       title: "Téléconsultation",
       description: "Consultez vos médecins à distance en toute sécurité.",
@@ -74,6 +73,7 @@ const FeaturesPage: React.FC = () => {
       ]
     },
     {
+      id: 'availability',
       icon: <Clock className="w-6 h-6" />,
       title: "Disponible 24/7",
       description: "Accédez à vos informations à tout moment, partout.",
@@ -87,6 +87,7 @@ const FeaturesPage: React.FC = () => {
       ]
     },
     {
+      id: 'security',
       icon: <Shield className="w-6 h-6" />,
       title: "Sécurité maximale",
       description: "Vos données sont protégées par les plus hauts standards.",
@@ -108,7 +109,7 @@ const FeaturesPage: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg flex items-center justify-center">
-                <Stethoscope className="w-4 h-4 text-white" />
+                <HeartPulse className="w-4 h-4 text-white" />
               </div>
               <span className="font-bold text-gray-900">Carnet Santé</span>
             </Link>
@@ -134,13 +135,14 @@ const FeaturesPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
+          {features.map((feature) => (
             <div
-              key={index}
-              className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all border border-gray-200 overflow-hidden"
+              key={feature.id}
+              id={feature.id}
+              className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all border border-gray-200 overflow-hidden scroll-mt-20 group"
             >
               <div className="p-6">
-                <div className={`w-12 h-12 ${feature.color} rounded-xl flex items-center justify-center mb-4`}>
+                <div className={`w-12 h-12 ${feature.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                   <div className={feature.textColor}>
                     {feature.icon}
                   </div>
@@ -153,7 +155,7 @@ const FeaturesPage: React.FC = () => {
                   {feature.description}
                 </p>
 
-                <div className="space-y-2">
+                <div className="space-y-2 mb-5">
                   {feature.details.map((detail, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-sm text-gray-500">
                       <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -161,6 +163,14 @@ const FeaturesPage: React.FC = () => {
                     </div>
                   ))}
                 </div>
+
+                <Link
+                  to="/register"
+                  className={`inline-flex items-center gap-1 text-sm font-semibold ${feature.textColor} hover:gap-2 transition-all`}
+                >
+                  Commencer
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
               </div>
             </div>
           ))}
@@ -176,9 +186,10 @@ const FeaturesPage: React.FC = () => {
           </p>
           <Link
             to="/register"
-            className="inline-flex items-center px-6 py-3 bg-white text-blue-600 rounded-xl font-semibold hover:shadow-lg transition-all"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-blue-600 rounded-xl font-semibold hover:shadow-lg transition-all group"
           >
             Créer un compte gratuit
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
       </div>
