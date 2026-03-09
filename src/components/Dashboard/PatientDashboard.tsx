@@ -246,22 +246,28 @@ const PatientDashboard: React.FC = () => {
         };
       });
 
-      console.log('🔄 Filtrage des rendez-vous à venir...');
-      const now = new Date();
+      console.log('🔄 Filtrage des rendez-vous...');
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS);
+
       const upcoming = transformedAppointments.filter(apt => {
         try {
           const appointmentDate = new Date(apt.appointmentDate);
           const isValidDate = !isNaN(appointmentDate.getTime());
-          const isFuture = appointmentDate >= now;
-          const isActive = apt.status !== 'cancelled' && apt.status !== 'completed';
-          return isValidDate && isFuture && isActive;
+          // On exclut seulement : dates invalides, annulés, et vieux de plus de 30 jours
+          const notTooOld = appointmentDate >= thirtyDaysAgo;
+          const notCancelled = apt.status !== 'cancelled';
+          return isValidDate && notTooOld && notCancelled;
         } catch (error) {
           console.warn('❌ Date de rendez-vous invalide:', apt.appointmentDate);
           return false;
         }
       });
 
-      console.log('✅ Rendez-vous à venir filtrés:', upcoming);
+      // Tri : en cours et à venir en premier, puis les terminés récents
+      upcoming.sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
+
+      console.log('✅ Rendez-vous filtrés:', upcoming);
       setUpcomingAppointments(upcoming);
     } catch (err) {
       console.error('❌ Erreur lors du chargement des rendez-vous:', err);
@@ -675,108 +681,180 @@ const PatientDashboard: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 futuristic-card p-8">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h2 className="text-2xl font-black gradient-text">
-                  Rendez-vous à venir
-                </h2>
-                <p className="text-white/60 text-sm mt-1">Vos prochaines consultations</p>
-              </div>
-              <Link
-                to="/appointments"
-                className="text-blue-400 hover:text-blue-300 text-sm font-semibold transition"
-              >
-                Voir tout →
-              </Link>
-            </div>
-            {appointmentsLoading ? (
-              <div className="text-center py-12">
-                <p className="text-white/50 text-lg">Chargement des rendez-vous...</p>
-              </div>
-            ) : upcomingAppointments.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-white/50 text-lg">Aucun rendez-vous à venir</p>
-                <Link
-                  to="/appointments/book"
-                  className="inline-block mt-4 px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition"
-                >
-                  Prendre un rendez-vous
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* ── Rendez-vous à venir / en cours ─────────────────────────── */}
+            <div className="futuristic-card p-8">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-2xl font-black gradient-text">Rendez-vous à venir</h2>
+                  <p className="text-white/60 text-sm mt-1">Vos consultations planifiées et en cours</p>
+                </div>
+                <Link to="/appointments" className="text-blue-400 hover:text-blue-300 text-sm font-semibold transition">
+                  Voir tout →
                 </Link>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {upcomingAppointments.map((appointment) => {
-                  const computed = getComputedStatus(appointment.status, appointment.appointmentDate, appointment.duration);
-                  return (
-                  <div
-                    key={appointment.id}
-                    className={`bg-white/5 border rounded-xl p-5 transition duration-300 ${
-                      computed === 'ongoing'
-                        ? 'border-blue-400/50 shadow-lg shadow-blue-500/10'
-                        : 'border-white/10 hover:bg-white/10 hover:border-white/20 cursor-pointer'
-                    }`}
-                  >
-                    {/* Bandeau "En cours" */}
-                    {computed === 'ongoing' && (
-                      <div className="flex items-center gap-2 mb-3 px-3 py-1.5 bg-blue-500/20 border border-blue-400/30 rounded-lg">
-                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping shrink-0" />
-                        <span className="text-blue-200 text-xs font-bold tracking-wider uppercase">Consultation en cours</span>
-                      </div>
-                    )}
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-lg">
-                            👨‍⚕️
-                          </div>
-                          <div>
-                            <p className="font-semibold text-white">
-                              Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}
-                            </p>
-                            <p className="text-xs text-white/60">
-                              {appointment.doctor.specialty}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4 text-sm text-white/70 mt-3">
-                          <span>📅 {formatAppointmentDate(appointment.appointmentDate)}</span>
-                          <span>🕐 {formatAppointmentTime(appointment.appointmentDate)}</span>
-                          <span>⏱️ {appointment.duration} min</span>
-                        </div>
-                        {appointment.reason && (
-                          <p className="text-white/60 text-sm mt-2">
-                            Motif: {appointment.reason}
-                          </p>
-                        )}
-                        <p className="text-white/50 text-xs mt-2">
-                          Type: {appointment.type === 'teleconsultation' ? 'Téléconsultation' :
-                                appointment.type === 'home_visit' ? 'Visite à domicile' : 'En personne'}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusClass(computed)}`}>
-                          {getStatusText(computed)}
-                        </span>
-                        <Link
-                          to={`/appointments/${appointment.id}`}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                            computed === 'completed'
-                              ? 'bg-white/10 text-white border-white/20 hover:bg-white/20'
-                              : computed === 'ongoing'
-                              ? 'bg-blue-400/20 text-blue-200 border-blue-400/30 hover:bg-blue-400/30 animate-pulse'
-                              : 'text-blue-400 border-transparent hover:text-blue-300'
+              {appointmentsLoading ? (
+                <div className="text-center py-12">
+                  <p className="text-white/50 text-lg">Chargement des rendez-vous...</p>
+                </div>
+              ) : (() => {
+                const activeApts = upcomingAppointments.filter(apt => {
+                  const s = getComputedStatus(apt.status, apt.appointmentDate, apt.duration);
+                  return ['pending', 'confirmed', 'ongoing'].includes(s);
+                });
+                return activeApts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-white/50 text-lg">Aucun rendez-vous à venir</p>
+                    <Link
+                      to="/appointments/book"
+                      className="inline-block mt-4 px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition"
+                    >
+                      Prendre un rendez-vous
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {activeApts.map((appointment) => {
+                      const computed = getComputedStatus(appointment.status, appointment.appointmentDate, appointment.duration);
+                      return (
+                        <div
+                          key={appointment.id}
+                          className={`bg-white/5 border rounded-xl p-5 transition duration-300 ${
+                            computed === 'ongoing'
+                              ? 'border-blue-400/50 shadow-lg shadow-blue-500/10'
+                              : 'border-white/10 hover:bg-white/10 hover:border-white/20'
                           }`}
                         >
-                          {computed === 'ongoing' ? '▶ En cours' : '👁 Voir détail'}
-                        </Link>
-                      </div>
+                          {computed === 'ongoing' && (
+                            <div className="flex items-center gap-2 mb-3 px-3 py-1.5 bg-blue-500/20 border border-blue-400/30 rounded-lg">
+                              <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping shrink-0" />
+                              <span className="text-blue-200 text-xs font-bold tracking-wider uppercase">Consultation en cours</span>
+                            </div>
+                          )}
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-2">
+                                <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-lg">
+                                  👨‍⚕️
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-white">
+                                    Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}
+                                  </p>
+                                  <p className="text-xs text-white/60">{appointment.doctor.specialty}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-4 text-sm text-white/70 mt-3">
+                                <span>📅 {formatAppointmentDate(appointment.appointmentDate)}</span>
+                                <span>🕐 {formatAppointmentTime(appointment.appointmentDate)}</span>
+                                <span>⏱️ {appointment.duration} min</span>
+                              </div>
+                              {appointment.reason && (
+                                <p className="text-white/60 text-sm mt-2">Motif: {appointment.reason}</p>
+                              )}
+                              <p className="text-white/50 text-xs mt-2">
+                                Type: {appointment.type === 'teleconsultation' ? 'Téléconsultation' :
+                                      appointment.type === 'home_visit' ? 'Visite à domicile' : 'En personne'}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusClass(computed)}`}>
+                                {getStatusText(computed)}
+                              </span>
+                              <Link
+                                to={`/appointments/${appointment.id}`}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                                  computed === 'ongoing'
+                                    ? 'bg-blue-400/20 text-blue-200 border-blue-400/30 hover:bg-blue-400/30 animate-pulse'
+                                    : 'text-blue-400 border-transparent hover:text-blue-300'
+                                }`}
+                              >
+                                {computed === 'ongoing' ? '▶ En cours' : '👁 Voir détail'}
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ── Historique des consultations ────────────────────────────── */}
+            {(() => {
+              const history = upcomingAppointments.filter(apt => {
+                const s = getComputedStatus(apt.status, apt.appointmentDate, apt.duration);
+                return ['completed', 'missed', 'no_show'].includes(s);
+              }).sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime());
+
+              if (history.length === 0) return null;
+
+              return (
+                <div className="futuristic-card p-8">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h2 className="text-2xl font-black gradient-text">Historique</h2>
+                      <p className="text-white/60 text-sm mt-1">{history.length} consultation{history.length > 1 ? 's' : ''} passée{history.length > 1 ? 's' : ''}</p>
                     </div>
                   </div>
-                  );
-                })}
-              </div>
-            )}
+                  <div className="space-y-3">
+                    {history.map((appointment) => {
+                      const computed = getComputedStatus(appointment.status, appointment.appointmentDate, appointment.duration);
+                      return (
+                        <div
+                          key={appointment.id}
+                          className="bg-white/3 border border-white/8 rounded-xl p-4 hover:bg-white/8 transition duration-200"
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            {/* Icône + infos médecin */}
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-base shrink-0 ${
+                                computed === 'completed' ? 'bg-gray-500/30' :
+                                computed === 'missed'    ? 'bg-orange-500/20' :
+                                'bg-red-500/20'
+                              }`}>
+                                {computed === 'completed' ? '✅' : computed === 'missed' ? '⚠️' : '👻'}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-white text-sm truncate">
+                                  Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}
+                                </p>
+                                <p className="text-white/50 text-xs truncate">{appointment.doctor.specialty}</p>
+                              </div>
+                            </div>
+                            {/* Date + heure */}
+                            <div className="text-right shrink-0 hidden sm:block">
+                              <p className="text-white/70 text-xs">{formatAppointmentDate(appointment.appointmentDate)}</p>
+                              <p className="text-white/40 text-xs">{formatAppointmentTime(appointment.appointmentDate)} · {appointment.duration} min</p>
+                            </div>
+                            {/* Statut + lien */}
+                            <div className="flex flex-col items-end gap-1.5 shrink-0">
+                              <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${getStatusClass(computed)}`}>
+                                {getStatusText(computed)}
+                              </span>
+                              <Link
+                                to={`/appointments/${appointment.id}`}
+                                className="text-xs text-white/40 hover:text-white/70 transition underline underline-offset-2"
+                              >
+                                Voir détail
+                              </Link>
+                            </div>
+                          </div>
+                          {appointment.reason && (
+                            <p className="text-white/40 text-xs mt-2 ml-13 pl-1 truncate">
+                              Motif : {appointment.reason}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
 
           <div className="futuristic-card p-8">
@@ -806,21 +884,21 @@ const PatientDashboard: React.FC = () => {
               <h3 className="text-sm font-semibold text-white/80 uppercase mb-4">Dernières activités</h3>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-white/60">Dernière consultation</span>
+                  <span className="text-white/60">Consultations terminées</span>
                   <span className="text-white font-medium">
-                    {upcomingAppointments.length > 0
-                      ? formatAppointmentDate(upcomingAppointments[0].appointmentDate)
-                      : 'Aucune'
-                    }
+                    {upcomingAppointments.filter(a => getComputedStatus(a.status, a.appointmentDate, a.duration) === 'completed').length}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/60">Prochain RDV</span>
-                  <span className="text-white font-medium">
-                    {upcomingAppointments.length > 0
-                      ? formatAppointmentDate(upcomingAppointments[0].appointmentDate)
-                      : 'Aucun'
-                    }
+                  <span className="text-white font-medium text-right">
+                    {(() => {
+                      const next = upcomingAppointments.find(a => {
+                        const s = getComputedStatus(a.status, a.appointmentDate, a.duration);
+                        return ['pending', 'confirmed'].includes(s);
+                      });
+                      return next ? formatAppointmentDate(next.appointmentDate) : 'Aucun';
+                    })()}
                   </span>
                 </div>
                 <div className="flex justify-between">
