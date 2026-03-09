@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/userService';
 import { appointmentService } from '../../services/appointmentService';
 import { medicalFileService } from '../../services/medicalFileService';
-import { calendarService } from '../../services/calendarService';
 import {
   Calendar, Users, Clock, X, Check, Bell, ChevronRight,
   LogOut, Plus, Video, FileText, Pill, Search, Send,
@@ -54,41 +53,34 @@ interface PrescriptionLine {
   instructions: string;
 }
 
-interface Calendar {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  startTime: string;
-  endTime: string;
-  daysOfWeek: string[];
-  slots: string[];
-  isActive: boolean;
-  createdAt: string;
-}
-
 const FREQUENCIES = ['1 fois/jour', '2 fois/jour', '3 fois/jour', 'Matin et soir', 'Au besoin', 'Avant les repas', 'Après les repas'];
 const DURATIONS   = ['3 jours', '5 jours', '7 jours', '10 jours', '14 jours', '1 mois', '3 mois', 'Continu'];
 
 const DoctorDashboard: React.FC = () => {
-  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { showNotification } = useNotification();
   const doctorUser = user as DoctorUser;
 
   const [appointments, setAppointments]               = useState<Appointment[]>([]);
-  const [calendars, setCalendars]                     = useState<Calendar[]>([]);
   const [loading, setLoading]                         = useState(true);
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
-  const [calendarsLoading, setCalendarsLoading]       = useState(false);
   const [error, setError]                             = useState<string | null>(null);
   const [filter, setFilter]                           = useState<'today' | 'pending' | 'upcoming'>('pending');
   const [stats, setStats]                             = useState({ totalAppointments: 0, todayAppointments: 0, totalPatients: 0 });
 
-  // ── Recherche ───────────────────────────────────────────────────────────────
-  const [searchPatient, setSearchPatient]                 = useState('');
-  const [videoSearchPatient, setVideoSearchPatient]       = useState('');
-  const [calendarSearch, setCalendarSearch]               = useState('');
+  // ── 🔔 Notification dropdown ────────────────────────────────────────────────
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // ── Prescription state ──────────────────────────────────────────────────────
   const [showPrescription, setShowPrescription]           = useState(false);
@@ -100,6 +92,7 @@ const DoctorDashboard: React.FC = () => {
   const [prescriptionNote, setPrescriptionNote]           = useState('');
   const [prescriptionSent, setPrescriptionSent]           = useState(false);
   const [prescriptionLoading, setPrescriptionLoading]     = useState(false);
+  const [searchPatient, setSearchPatient]                 = useState('');
 
   // ── Video call state ────────────────────────────────────────────────────────
   const [showVideoModal, setShowVideoModal]             = useState(false);
@@ -107,10 +100,7 @@ const DoctorDashboard: React.FC = () => {
   const [videoAppointmentId, setVideoAppointmentId]     = useState<string | null>(null);
   const [videoLink, setVideoLink]                       = useState('');
   const [videoLoading, setVideoLoading]                 = useState(false);
-
-  // ── Notifications state ─────────────────────────────────────────────────────
-  const [showNotifications, setShowNotifications]       = useState(false);
-  const [notifications, setNotifications]               = useState<any[]>([]);
+  const [videoSearchPatient, setVideoSearchPatient]     = useState('');
 
   // ─────────────────────────────────────────────────────────────────────────────
   // DATA FETCHING
@@ -136,18 +126,6 @@ const DoctorDashboard: React.FC = () => {
     finally { setAppointmentsLoading(false); }
   };
 
-  const fetchCalendars = async () => {
-    try {
-      setCalendarsLoading(true);
-      const data = await calendarService.getCalendars();
-      setCalendars(data || []);
-    } catch (error) {
-      console.error('Erreur chargement calendriers:', error);
-    } finally {
-      setCalendarsLoading(false);
-    }
-  };
-
   const fetchStats = async () => {
     try {
       const statsResponse = await userService.getDashboardStats();
@@ -155,28 +133,11 @@ const DoctorDashboard: React.FC = () => {
     } catch { /* silencieux */ }
   };
 
-  const fetchNotifications = async () => {
-    try {
-      // Simuler des notifications (à remplacer par un vrai service)
-      const mockNotifications = [
-        { id: '1', message: 'Nouveau rendez-vous en attente', time: 'Il y a 5 min', read: false },
-        { id: '2', message: 'Paiement reçu de 50€', time: 'Il y a 1h', read: false },
-        { id: '3', message: 'Rappel: Consultation avec Martin Dupont à 14h', time: 'Il y a 2h', read: true },
-      ];
-      setNotifications(mockNotifications);
-    } catch (error) {
-      console.error('Erreur chargement notifications:', error);
-    }
-  };
-
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true); setError(null);
-        await fetchStats(); 
-        await fetchAppointments();
-        await fetchCalendars();
-        await fetchNotifications();
+        await fetchStats(); await fetchAppointments();
       } catch (error: any) {
         setError(error.message || 'Impossible de charger les données.');
         setStats({ totalAppointments: 24, todayAppointments: 5, totalPatients: 12 });
@@ -208,18 +169,8 @@ const DoctorDashboard: React.FC = () => {
     } catch { showNotification('❌ Erreur lors de l\'annulation', 'error'); }
   };
 
-  const toggleCalendarStatus = async (calendarId: string, currentStatus: boolean) => {
-    try {
-      await calendarService.toggleCalendarStatus(calendarId, !currentStatus);
-      showNotification(`✅ Calendrier ${!currentStatus ? 'activé' : 'désactivé'}`, 'success');
-      fetchCalendars();
-    } catch (error) {
-      showNotification('❌ Erreur lors du changement de statut', 'error');
-    }
-  };
-
   // ─────────────────────────────────────────────────────────────────────────────
-  // PRESCRIPTION
+  // ✅ PRESCRIPTION — APPEL API RÉEL
   // ─────────────────────────────────────────────────────────────────────────────
 
   const openPrescription = (patient: Appointment['patient'], appointmentId?: string) => {
@@ -290,7 +241,7 @@ const DoctorDashboard: React.FC = () => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // VIDEO CALL
+  // ✅ APPEL VIDÉO — APPEL API RÉEL
   // ─────────────────────────────────────────────────────────────────────────────
 
   const openVideoModal = (patient: Appointment['patient'], appointmentId?: string) => {
@@ -333,19 +284,6 @@ const DoctorDashboard: React.FC = () => {
     }
   };
 
-  const markNotificationAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(n => ({ ...n, read: true }))
-    );
-    showNotification('Toutes les notifications ont été marquées comme lues', 'success');
-  };
-
   // ─────────────────────────────────────────────────────────────────────────────
   // HELPERS
   // ─────────────────────────────────────────────────────────────────────────────
@@ -377,12 +315,6 @@ const DoctorDashboard: React.FC = () => {
     `${p.firstName} ${p.lastName}`.toLowerCase().includes(videoSearchPatient.toLowerCase())
   );
 
-  const filteredCalendars = calendars.filter(cal =>
-    !calendarSearch || 
-    cal.name?.toLowerCase().includes(calendarSearch.toLowerCase()) ||
-    cal.startDate?.includes(calendarSearch)
-  );
-
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return {
@@ -392,19 +324,14 @@ const DoctorDashboard: React.FC = () => {
     };
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
+  const pendingAppointments = appointments.filter(a => a.status === 'pending');
 
   const statCards: StatCard[] = [
     { title: "Rendez-vous aujourd'hui", value: stats.todayAppointments, icon: Calendar, color: 'from-blue-500 to-blue-600' },
     { title: 'Total rendez-vous',       value: stats.totalAppointments,  icon: Calendar, color: 'from-green-500 to-green-600' },
     { title: 'Patients totaux',          value: stats.totalPatients,      icon: Users,    color: 'from-purple-500 to-purple-600' },
-    { title: 'En attente',               value: appointments.filter(a => a.status === 'pending').length, icon: Clock, color: 'from-yellow-500 to-yellow-600' },
+    { title: 'En attente',               value: pendingAppointments.length, icon: Clock, color: 'from-yellow-500 to-yellow-600' },
   ];
-
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -431,67 +358,119 @@ const DoctorDashboard: React.FC = () => {
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-4">
-            {/* Notifications - Icône cliquable avec dropdown */}
-            <div className="relative">
-              <button 
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300 relative"
+
+            {/* ══ 🔔 CLOCHE CLIQUABLE ══ */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setShowNotifDropdown(prev => !prev)}
+                className="relative p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300"
+                title={pendingAppointments.length > 0 ? `${pendingAppointments.length} rendez-vous en attente` : 'Aucune notification'}
               >
-                <Bell className="w-5 h-5 text-white" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg pulse-glow">
-                    {unreadCount}
+                <Bell className={`w-5 h-5 text-white ${pendingAppointments.length > 0 ? 'animate-bounce' : ''}`} />
+                {pendingAppointments.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg pulse-glow">
+                    {pendingAppointments.length}
                   </span>
                 )}
               </button>
 
-              {/* Dropdown notifications */}
-              {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-gray-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
-                  <div className="p-3 border-b border-white/10 flex justify-between items-center">
-                    <h4 className="text-white font-semibold">Notifications</h4>
-                    {unreadCount > 0 && (
-                      <button 
-                        onClick={markAllAsRead}
-                        className="text-xs text-blue-400 hover:text-blue-300"
-                      >
-                        Tout marquer comme lu
-                      </button>
-                    )}
+              {/* ── Dropdown notifications ── */}
+              {showNotifDropdown && (
+                <div
+                  className="absolute right-0 top-14 w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                  style={{ animation: 'notifDropIn 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards' }}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-b border-white/10">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-yellow-400" />
+                      <span className="text-white font-bold text-sm">Notifications</span>
+                      {pendingAppointments.length > 0 && (
+                        <span className="bg-yellow-500 text-black text-xs font-black px-2 py-0.5 rounded-full">
+                          {pendingAppointments.length}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowNotifDropdown(false)}
+                      className="text-gray-500 hover:text-white transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">
-                        Aucune notification
+
+                  {/* Liste des notifications */}
+                  <div className="max-h-72 overflow-y-auto">
+                    {pendingAppointments.length === 0 ? (
+                      <div className="py-10 text-center">
+                        <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-60" />
+                        <p className="text-gray-400 text-sm font-medium">Tout est à jour !</p>
+                        <p className="text-gray-600 text-xs mt-1">Aucun rendez-vous en attente</p>
                       </div>
                     ) : (
-                      notifications.map(notif => (
-                        <div 
-                          key={notif.id} 
-                          className={`p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition ${
-                            !notif.read ? 'bg-blue-500/5' : ''
-                          }`}
-                          onClick={() => markNotificationAsRead(notif.id)}
-                        >
-                          <p className="text-white text-sm">{notif.message}</p>
-                          <p className="text-gray-500 text-xs mt-1">{notif.time}</p>
-                        </div>
-                      ))
+                      pendingAppointments.map(apt => {
+                        const { date, time } = formatDateTime(apt.appointmentDate);
+                        return (
+                          <div key={apt.id} className="px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <div className="flex items-start gap-3">
+                              {/* Avatar */}
+                              <div className="w-9 h-9 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                                <span className="text-white text-xs font-bold">
+                                  {apt.patient?.firstName?.[0]}{apt.patient?.lastName?.[0]}
+                                </span>
+                              </div>
+                              {/* Infos */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white text-sm font-semibold truncate">
+                                  {apt.patient?.firstName} {apt.patient?.lastName}
+                                </p>
+                                <p className="text-gray-400 text-xs truncate">{apt.reason}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-yellow-400 text-xs font-medium">{date}</span>
+                                  <span className="text-gray-600 text-xs">•</span>
+                                  <span className="text-gray-300 text-xs">{time}</span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Actions rapides */}
+                            <div className="flex gap-2 mt-2.5 ml-12">
+                              <button
+                                onClick={() => { handleConfirmAppointment(apt.id); setShowNotifDropdown(false); }}
+                                className="flex-1 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-all flex items-center justify-center gap-1"
+                              >
+                                <Check className="w-3 h-3" /> Confirmer
+                              </button>
+                              <button
+                                onClick={() => { handleCancelAppointment(apt.id); setShowNotifDropdown(false); }}
+                                className="flex-1 py-1.5 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all flex items-center justify-center gap-1"
+                              >
+                                <X className="w-3 h-3" /> Refuser
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
-                  <div className="p-2 border-t border-white/10">
-                    <Link 
-                      to="/notifications" 
-                      className="block text-center text-sm text-blue-400 hover:text-blue-300 py-1"
-                      onClick={() => setShowNotifications(false)}
-                    >
-                      Voir toutes les notifications
-                    </Link>
-                  </div>
+
+                  {/* Footer */}
+                  {pendingAppointments.length > 0 && (
+                    <div className="px-4 py-3 border-t border-white/10 bg-white/5">
+                      <button
+                        onClick={() => { setFilter('pending'); setShowNotifDropdown(false); }}
+                        className="w-full text-center text-blue-400 hover:text-blue-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1"
+                      >
+                        Voir tous les rendez-vous en attente
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+            {/* ══ FIN CLOCHE ══ */}
 
             <button onClick={handleLogout} className="futuristic-btn-secondary flex items-center gap-2 hover:scale-105">
               <LogOut className="w-5 h-5" />
@@ -655,7 +634,6 @@ const DoctorDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Filtres + Barre de recherche */}
           <div className="flex flex-col sm:flex-row gap-3 mb-5">
             <div className="flex gap-1 p-1 bg-white/5 backdrop-blur-md rounded-xl border border-white/10">
               {(['pending', 'today', 'upcoming'] as const).map(f => (
@@ -670,13 +648,13 @@ const DoctorDashboard: React.FC = () => {
                       : 'text-gray-300 hover:bg-white/10'
                   }`}
                 >
-                  {f === 'pending'  ? `En attente (${appointments.filter(a => a.status === 'pending').length})`
+                  {f === 'pending'  ? `En attente (${pendingAppointments.length})`
                    : f === 'today'  ? "Aujourd'hui"
                    : 'À venir'}
                 </button>
               ))}
             </div>
-            
+
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -702,22 +680,21 @@ const DoctorDashboard: React.FC = () => {
           ) : (
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
               {filteredAppointments
-                .filter(apt => 
-                  !searchPatient || 
+                .filter(apt =>
+                  !searchPatient ||
                   `${apt.patient?.firstName} ${apt.patient?.lastName}`.toLowerCase().includes(searchPatient.toLowerCase())
                 )
                 .map(apt => {
                   const { date, time, day } = formatDateTime(apt.appointmentDate);
                   return (
                     <div key={apt.id} className={`p-4 bg-white/5 border rounded-xl hover:bg-white/10 transition-all ${
-                      apt.status === 'pending' 
-                        ? 'border-yellow-500/30 hover:border-yellow-500/50' 
-                        : apt.status === 'confirmed' 
+                      apt.status === 'pending'
+                        ? 'border-yellow-500/30 hover:border-yellow-500/50'
+                        : apt.status === 'confirmed'
                         ? 'border-green-500/30 hover:border-green-500/50'
                         : 'border-white/10 hover:border-white/30'
                     }`}>
                       <div className="flex items-start justify-between gap-4">
-                        {/* Informations patient */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shrink-0">
@@ -734,8 +711,6 @@ const DoctorDashboard: React.FC = () => {
                               </p>
                             </div>
                           </div>
-
-                          {/* Date et Heure */}
                           <div className="grid grid-cols-2 gap-2 mb-2">
                             <div className="bg-white/5 rounded-lg p-2">
                               <p className="text-xs text-gray-400 mb-1">Date</p>
@@ -748,42 +723,34 @@ const DoctorDashboard: React.FC = () => {
                               <p className="text-gray-300 text-xs">{apt.duration} min</p>
                             </div>
                           </div>
-
-                          {/* Motif */}
                           <div className="bg-white/5 rounded-lg p-2 mb-2">
                             <p className="text-xs text-gray-400 mb-1">Motif</p>
                             <p className="text-white text-sm truncate">{apt.reason}</p>
                           </div>
-
-                          {/* Badge statut */}
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                            apt.status === 'pending' 
+                            apt.status === 'pending'
                               ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
                               : apt.status === 'confirmed'
                               ? 'bg-green-500/20 text-green-300 border border-green-500/30'
                               : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                           }`}>
-                            {apt.status === 'pending' ? '⏳ En attente' : 
-                             apt.status === 'confirmed' ? '✅ Confirmé' : 
+                            {apt.status === 'pending' ? '⏳ En attente' :
+                             apt.status === 'confirmed' ? '✅ Confirmé' :
                              apt.status}
                           </span>
                         </div>
-
-                        {/* Actions */}
                         <div className="flex flex-col gap-2 shrink-0">
                           {apt.status === 'pending' && (
                             <>
-                              <button 
-                                onClick={() => handleConfirmAppointment(apt.id)} 
+                              <button
+                                onClick={() => handleConfirmAppointment(apt.id)}
                                 className="px-3 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
-                                title="Confirmer le rendez-vous"
                               >
                                 <Check className="w-3 h-3" /> Confirmer
                               </button>
-                              <button 
-                                onClick={() => handleCancelAppointment(apt.id)} 
+                              <button
+                                onClick={() => handleCancelAppointment(apt.id)}
                                 className="px-3 py-1.5 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
-                                title="Refuser le rendez-vous"
                               >
                                 <X className="w-3 h-3" /> Refuser
                               </button>
@@ -791,20 +758,20 @@ const DoctorDashboard: React.FC = () => {
                           )}
                           {apt.status === 'confirmed' && (
                             <>
-                              <button 
-                                onClick={() => openPrescription(apt.patient, apt.id)} 
+                              <button
+                                onClick={() => openPrescription(apt.patient, apt.id)}
                                 className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-semibold hover:bg-emerald-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
                               >
                                 <FileText className="w-3 h-3" /> Ordonnance
                               </button>
-                              <button 
-                                onClick={() => openVideoModal(apt.patient, apt.id)} 
+                              <button
+                                onClick={() => openVideoModal(apt.patient, apt.id)}
                                 className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-semibold hover:bg-blue-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
                               >
                                 <Video className="w-3 h-3" /> Appel vidéo
                               </button>
-                              <Link 
-                                to={`/appointments/${apt.id}`} 
+                              <Link
+                                to={`/appointments/${apt.id}`}
                                 className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg text-xs font-semibold hover:from-blue-600 hover:to-cyan-700 transition-all flex items-center gap-1.5 shadow-lg whitespace-nowrap"
                               >
                                 Détails <ChevronRight className="w-3 h-3" />
@@ -863,21 +830,19 @@ const DoctorDashboard: React.FC = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                 <span className="text-gray-300 text-sm">En attente</span>
-                <span className="font-bold text-yellow-400 text-lg">
-                  {appointments.filter(a => a.status === 'pending').length}
-                </span>
+                <span className="font-bold text-yellow-400 text-lg">{pendingAppointments.length}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                 <span className="text-gray-300 text-sm">Confirmés aujourd'hui</span>
                 <span className="font-bold text-green-400 text-lg">
-                  {appointments.filter(a => a.status === 'confirmed' && 
+                  {appointments.filter(a => a.status === 'confirmed' &&
                     new Date(a.appointmentDate).toDateString() === new Date().toDateString()).length}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                 <span className="text-gray-300 text-sm">Taux de confirmation</span>
                 <span className="font-bold text-blue-400 text-lg">
-                  {appointments.length > 0 ? 
+                  {appointments.length > 0 ?
                     Math.round((appointments.filter(a => a.status === 'confirmed').length / appointments.length) * 100) : 0}%
                 </span>
               </div>
@@ -886,163 +851,17 @@ const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* GESTION DES CALENDRIERS - MÊME DISPOSITION QUE LES AUTRES SECTIONS */}
+      {/* GESTION CALENDRIER */}
       <div className="futuristic-card p-6">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="p-2.5 bg-purple-500/20 rounded-xl">
-            <Calendar className="w-6 h-6 text-purple-400" />
-          </div>
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold text-white">Gestion des calendriers</h3>
-            <p className="text-gray-400 text-sm">Créez et gérez vos disponibilités</p>
+            <h3 className="text-xl font-bold text-white mb-2">Gestion des disponibilités</h3>
+            <p className="text-gray-400 text-sm">Créez et gérez vos calendriers de disponibilités</p>
           </div>
-        </div>
-
-        {/* Barre de recherche et bouton d'ajout */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Rechercher un calendrier..."
-              value={calendarSearch}
-              onChange={e => setCalendarSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 text-sm"
-            />
-          </div>
-          <Link to="/doctor/calendar/new" className="px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg hover:from-purple-600 hover:to-purple-700 transition-all hover:scale-105 whitespace-nowrap">
-            <Plus className="w-4 h-4" /> Nouveau calendrier
+          <Link to="/doctor/calendar" className="futuristic-btn flex items-center gap-2">
+            <Plus className="w-5 h-5" /> Créer un nouveau calendrier
           </Link>
         </div>
-
-        {/* Liste des calendriers */}
-        {calendarsLoading ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto"></div>
-            <p className="text-gray-400 mt-4">Chargement des calendriers...</p>
-          </div>
-        ) : filteredCalendars.length === 0 ? (
-          <div className="text-center py-12">
-            <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400">Aucun calendrier trouvé</p>
-            <p className="text-gray-500 text-sm mt-1">Créez votre premier calendrier de disponibilités</p>
-          </div>
-        ) : (
-          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-            {filteredCalendars.map(cal => (
-              <div key={cal.id} className={`p-4 bg-white/5 border rounded-xl hover:bg-white/10 hover:border-purple-500/30 transition-all ${
-                cal.isActive ? 'border-white/10' : 'border-white/5 opacity-75'
-              }`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`w-10 h-10 bg-gradient-to-br rounded-lg flex items-center justify-center shrink-0 ${
-                        cal.isActive 
-                          ? 'from-purple-500 to-pink-600' 
-                          : 'from-gray-500 to-gray-600'
-                      }`}>
-                        <Calendar className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-white font-medium text-sm truncate">
-                          {cal.name || `Disponibilités`}
-                        </p>
-                        <p className="text-gray-500 text-xs truncate">
-                          {cal.slots?.length || 0} créneaux disponibles
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <div className="bg-white/5 rounded-lg p-2">
-                        <p className="text-xs text-gray-400 mb-1">Période</p>
-                        <p className="text-white text-sm font-semibold">{formatDate(cal.startDate)}</p>
-                        <p className="text-gray-300 text-xs">au {formatDate(cal.endDate)}</p>
-                      </div>
-                      <div className="bg-white/5 rounded-lg p-2">
-                        <p className="text-xs text-gray-400 mb-1">Créneaux</p>
-                        <p className="text-white text-sm font-semibold">{cal.startTime} - {cal.endTime}</p>
-                        <p className="text-gray-300 text-xs">{cal.daysOfWeek?.join(', ')}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {cal.slots?.slice(0, 5).map((slot: string, idx: number) => (
-                        <span key={idx} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">
-                          {slot}
-                        </span>
-                      ))}
-                      {cal.slots?.length > 5 && (
-                        <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 rounded text-xs">
-                          +{cal.slots.length - 5}
-                        </span>
-                      )}
-                    </div>
-
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                      cal.isActive 
-                        ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                        : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-                    }`}>
-                      {cal.isActive && <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>}
-                      {cal.isActive ? 'Actif' : 'Inactif'}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col gap-2 shrink-0">
-                    <Link 
-                      to={`/doctor/calendar/edit/${cal.id}`} 
-                      className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-semibold hover:bg-blue-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
-                    >
-                      <FileText className="w-3 h-3" /> Modifier
-                    </Link>
-                    <button 
-                      onClick={() => toggleCalendarStatus(cal.id, cal.isActive)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                        cal.isActive 
-                          ? 'bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30'
-                          : 'bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30'
-                      }`}
-                    >
-                      {cal.isActive ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-                      {cal.isActive ? 'Désactiver' : 'Activer'}
-                    </button>
-                    <Link 
-                      to={`/doctor/calendar/${cal.id}`} 
-                      className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg text-xs font-semibold hover:from-purple-600 hover:to-pink-700 transition-all flex items-center gap-1.5 shadow-lg whitespace-nowrap"
-                    >
-                      Détails <ChevronRight className="w-3 h-3" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Pied de page avec statistiques */}
-        {calendars.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-white/10">
-            <div className="flex justify-between items-center text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400">Total calendriers:</span>
-                <span className="text-white font-bold">{calendars.length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400">Actifs:</span>
-                <span className="text-green-400 font-bold">
-                  {calendars.filter(c => c.isActive).length}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400">Créneaux totaux:</span>
-                <span className="text-purple-400 font-bold">
-                  {calendars.reduce((acc, c) => acc + (c.slots?.length || 0), 0)}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ══════════════════ MODAL ORDONNANCE ══════════════════ */}
@@ -1079,7 +898,6 @@ const DoctorDashboard: React.FC = () => {
               </div>
             ) : (
               <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-
                 {prescriptionLines.map((line, idx) => (
                   <div key={line.id} className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-3">
                     <div className="flex items-center justify-between mb-1">
@@ -1093,66 +911,36 @@ const DoctorDashboard: React.FC = () => {
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        placeholder="Nom du médicament *"
-                        value={line.medication}
-                        onChange={e => updateLine(line.id, 'medication', e.target.value)}
-                        className="col-span-2 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Posologie (ex: 1 comprimé) *"
-                        value={line.dosage}
-                        onChange={e => updateLine(line.id, 'dosage', e.target.value)}
-                        className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
-                      />
+                      <input type="text" placeholder="Nom du médicament *" value={line.medication} onChange={e => updateLine(line.id, 'medication', e.target.value)}
+                        className="col-span-2 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm" />
+                      <input type="text" placeholder="Posologie (ex: 1 comprimé) *" value={line.dosage} onChange={e => updateLine(line.id, 'dosage', e.target.value)}
+                        className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm" />
                       <select value={line.frequency} onChange={e => updateLine(line.id, 'frequency', e.target.value)} className="px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500/50 text-sm">
                         {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
                       </select>
                       <select value={line.duration} onChange={e => updateLine(line.id, 'duration', e.target.value)} className="px-3 py-2.5 bg-gray-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500/50 text-sm">
                         {DURATIONS.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
-                      <input
-                        type="text"
-                        placeholder="Instructions particulières"
-                        value={line.instructions}
-                        onChange={e => updateLine(line.id, 'instructions', e.target.value)}
-                        className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm"
-                      />
+                      <input type="text" placeholder="Instructions particulières" value={line.instructions} onChange={e => updateLine(line.id, 'instructions', e.target.value)}
+                        className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm" />
                     </div>
                   </div>
                 ))}
-
                 <button onClick={addPrescriptionLine} className="w-full py-2.5 border border-dashed border-emerald-500/30 text-emerald-400 rounded-xl text-sm font-medium hover:bg-emerald-500/5 transition-colors flex items-center justify-center gap-2">
                   <Plus className="w-4 h-4" /> Ajouter un médicament
                 </button>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">Note / Recommandations</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Conseils, recommandations, suivi..."
-                    value={prescriptionNote}
-                    onChange={e => setPrescriptionNote(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm resize-none"
-                  />
+                  <textarea rows={3} placeholder="Conseils, recommandations, suivi..." value={prescriptionNote} onChange={e => setPrescriptionNote(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 text-sm resize-none" />
                 </div>
-
                 <div className="flex gap-3 pt-2">
                   <button onClick={() => setShowPrescription(false)} className="flex-1 py-3 bg-white/5 border border-white/10 text-gray-300 rounded-xl font-semibold hover:bg-white/10 transition-colors">
                     Annuler
                   </button>
-                  <button
-                    onClick={sendPrescription}
-                    disabled={prescriptionLoading}
-                    className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {prescriptionLoading ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <><Send className="w-4 h-4" /> Envoyer l'ordonnance</>
-                    )}
+                  <button onClick={sendPrescription} disabled={prescriptionLoading}
+                    className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+                    {prescriptionLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Send className="w-4 h-4" /> Envoyer l'ordonnance</>}
                   </button>
                 </div>
               </div>
@@ -1165,7 +953,6 @@ const DoctorDashboard: React.FC = () => {
       {showVideoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) setShowVideoModal(false); }}>
           <div className="w-full max-w-md bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-
             <div className="flex items-center justify-between p-6 border-b border-white/10 bg-gradient-to-r from-blue-500/10 to-cyan-500/10">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/20 rounded-xl"><Video className="w-5 h-5 text-blue-400" /></div>
@@ -1178,7 +965,6 @@ const DoctorDashboard: React.FC = () => {
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
-
             <div className="p-6 space-y-5">
               {videoPatient && (
                 <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/10">
@@ -1191,47 +977,41 @@ const DoctorDashboard: React.FC = () => {
                   </div>
                 </div>
               )}
-
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-2">Lien de la salle</label>
-                <input
-                  type="text"
-                  value={videoLink}
-                  onChange={e => setVideoLink(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500/50"
-                />
+                <input type="text" value={videoLink} onChange={e => setVideoLink(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500/50" />
                 <p className="text-gray-500 text-xs mt-1.5">
                   Propulsé par <span className="text-blue-400">Jitsi Meet</span> — le lien sera enregistré dans le dossier du patient
                 </p>
               </div>
-
               <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
                 <AlertCircle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
                 <p className="text-yellow-300 text-xs">
                   L'appel sera enregistré dans le dossier médical du patient avec le lien pour qu'il puisse rejoindre.
                 </p>
               </div>
-
               <div className="flex gap-3">
                 <button onClick={() => setShowVideoModal(false)} className="flex-1 py-3 bg-white/5 border border-white/10 text-gray-300 rounded-xl font-semibold hover:bg-white/10 transition-colors">
                   Annuler
                 </button>
-                <button
-                  onClick={startVideoCall}
-                  disabled={videoLoading}
-                  className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {videoLoading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <><Video className="w-4 h-4" /> Lancer l'appel</>
-                  )}
+                <button onClick={startVideoCall} disabled={videoLoading}
+                  className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed">
+                  {videoLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Video className="w-4 h-4" /> Lancer l'appel</>}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Animation dropdown */}
+      <style>{`
+        @keyframes notifDropIn {
+          from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
 
     </div>
   );
