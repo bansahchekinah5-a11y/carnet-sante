@@ -861,6 +861,14 @@ const DoctorDashboard: React.FC = () => {
                               </Link>
                             </>
                           )}
+                          {computed === 'completed' && (
+                            <Link
+                              to={`/appointments/${apt.id}`}
+                              className="px-3 py-1.5 bg-gray-500/20 border border-gray-400/30 text-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                              <CheckCircle2 className="w-3 h-3" /> Voir détail
+                            </Link>
+                          )}
                         </div>
                       </div>
                     </div>
