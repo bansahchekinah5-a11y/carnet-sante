@@ -83,14 +83,14 @@ const PatientDashboard: React.FC = () => {
   }, []);
 
   const getComputedStatus = (dbStatus: string, appointmentDate: string, duration: number = 30): string => {
-    if (['cancelled', 'no_show', 'missed', 'completed'].includes(dbStatus)) return dbStatus;
+    if (['cancelled', 'no_show'].includes(dbStatus)) return dbStatus;
+
     const start = new Date(appointmentDate).getTime();
-    const end   = start + duration * 60 * 1000;
+    const end   = start + (duration || 30) * 60 * 1000;
     const t     = now.getTime();
-    if (dbStatus === 'confirmed' || dbStatus === 'ongoing') {
-      if (t >= end)   return 'completed';
-      if (t >= start) return 'ongoing';
-    }
+
+    if (t >= end)   return 'completed';
+    if (t >= start) return (dbStatus === 'confirmed' || dbStatus === 'ongoing') ? 'ongoing' : dbStatus;
     return dbStatus;
   };
 
