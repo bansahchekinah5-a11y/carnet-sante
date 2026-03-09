@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from "../../context/AuthContext";
 import { calendarService } from '../../services/calendarService';
 import { userService } from '../../services/userService';
 import { appointmentService } from '../../services/appointmentService';
-import { X, Check, CreditCard, Calendar, Clock, User, ChevronRight, ArrowLeft } from 'lucide-react';
+import { X, Check, CreditCard, Calendar, Clock, User, ChevronRight, ArrowLeft, Camera } from 'lucide-react';
 import { useNotification } from '../../context/NotificationContext';
+
 interface Doctor {
   id: string;
   firstName: string;
@@ -15,6 +16,7 @@ interface Doctor {
   availableSlots: string[];
   consultationPrice?: number;
 }
+
 interface Calendar {
   id: string;
   date: string;
@@ -22,6 +24,7 @@ interface Calendar {
   confirmed: boolean;
   doctor: { firstName: string; lastName: string };
 }
+
 interface Appointment {
   id: string;
   doctor: { firstName: string; lastName: string; specialty: string };
@@ -31,10 +34,16 @@ interface Appointment {
   type: 'in_person' | 'teleconsultation' | 'home_visit';
   reason: string;
 }
+
 const PatientDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfilePicture } = useAuth();
   const { showNotification } = useNotification();
+  
+  // États pour l'upload de photo
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
@@ -59,11 +68,13 @@ const PatientDashboard: React.FC = () => {
     date: '', 
     cvv: '' 
   });
+
   const medicalSummary = {
     allergies: 2,
     medications: 3,
     conditions: 1,
   };
+
   const generateDates = () => {
     const dates = [];
     const today = new Date();
@@ -76,11 +87,13 @@ const PatientDashboard: React.FC = () => {
     }
     return dates;
   };
+
   useEffect(() => {
     if (selectedDoctor && selectedDate) {
       loadAvailableSlots();
     }
   }, [selectedDoctor, selectedDate]);
+
   const loadAvailableSlots = async () => {
     if (!selectedDoctor || !selectedDate) return;
     setIsLoadingSlots(true);
@@ -96,6 +109,65 @@ const PatientDashboard: React.FC = () => {
       setIsLoadingSlots(false);
     }
   };
+
+  // ✅ Fonction pour uploader la photo de profil
+  const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validation
+    if (!file.type.startsWith('image/')) {
+      showNotification('Veuillez sélectionner une image', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification('L\'image ne doit pas dépasser 5MB', 'error');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('profilePicture', file);
+
+    try {
+      setUploading(true);
+      
+      const token = localStorage.getItem('token');
+      const API_URL = import.meta.env.VITE_API_URL || 'https://carnet-sante-backend.onrender.com/api';
+
+      console.log('📸 Upload de la photo...');
+      
+      const response = await fetch(`${API_URL}/profile/picture`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Erreur lors de l\'upload');
+      }
+
+      if (data.success) {
+        // ✅ Mise à jour avec le nouveau token
+        updateProfilePicture(data.data.profilePicture, data.data.token);
+        showNotification('✅ Photo de profil mise à jour', 'success');
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur upload:', error);
+      showNotification(error.message || 'Erreur lors de l\'upload', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   const fetchAppointments = async () => {
     if (!user?.id) {
       setAppointmentsLoading(false);
@@ -106,16 +178,19 @@ const PatientDashboard: React.FC = () => {
       console.log('🔄 Chargement des rendez-vous depuis le service...');
       const appointments = await appointmentService.getAppointments();
       console.log('📋 Rendez-vous reçus du service:', appointments);
+      
       if (!appointments || !Array.isArray(appointments)) {
         console.warn('⚠️ Les rendez-vous ne sont pas un tableau:', appointments);
         setUpcomingAppointments([]);
         return;
       }
+      
       if (appointments.length === 0) {
         console.log('ℹ️ Aucun rendez-vous trouvé');
         setUpcomingAppointments([]);
         return;
       }
+      
       const transformedAppointments: Appointment[] = appointments.map((apt: any, index: number) => {
         return {
           id: apt.id || `temp-${index}`,
@@ -131,6 +206,7 @@ const PatientDashboard: React.FC = () => {
           reason: apt.reason || 'Consultation médicale'
         };
       });
+      
       console.log('🔄 Filtrage des rendez-vous à venir...');
       const now = new Date();
       const upcoming = transformedAppointments.filter(apt => {
@@ -145,6 +221,7 @@ const PatientDashboard: React.FC = () => {
           return false;
         }
       });
+      
       console.log('✅ Rendez-vous à venir filtrés:', upcoming);
       setUpcomingAppointments(upcoming);
     } catch (err) {
@@ -154,6 +231,7 @@ const PatientDashboard: React.FC = () => {
       setAppointmentsLoading(false);
     }
   };
+
   useEffect(() => {
     const fetchData = async () => {
       if (!user?.id) {
@@ -166,6 +244,7 @@ const PatientDashboard: React.FC = () => {
         console.log('🔄 Chargement des médecins...');
         const doctorsData = await appointmentService.getDoctors();
         console.log('👨‍⚕️ Médecins reçus:', doctorsData);
+        
         const fetchedDoctors: Doctor[] = doctorsData.map((d: any) => ({
           id: d.id,
           firstName: d.firstName,
@@ -175,6 +254,7 @@ const PatientDashboard: React.FC = () => {
           availableSlots: d.availableSlots || ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
           consultationPrice: d.consultationPrice || 50
         }));
+        
         setDoctors(fetchedDoctors);
         setCalendars([]);
         await fetchAppointments();
@@ -219,6 +299,7 @@ const PatientDashboard: React.FC = () => {
     };
     fetchData();
   }, [user?.id]);
+
   const formatAppointmentDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -232,6 +313,7 @@ const PatientDashboard: React.FC = () => {
       return 'Date invalide';
     }
   };
+
   const formatAppointmentTime = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -240,6 +322,7 @@ const PatientDashboard: React.FC = () => {
       return 'Heure invalide';
     }
   };
+
   const getStatusText = (status: string) => {
     const statusMap = {
       confirmed: '✓ Confirmé',
@@ -251,6 +334,7 @@ const PatientDashboard: React.FC = () => {
     };
     return statusMap[status as keyof typeof statusMap] || status;
   };
+
   const getStatusClass = (status: string) => {
     const classMap = {
       confirmed: 'bg-green-500/20 text-green-300 border border-green-500/30',
@@ -262,10 +346,12 @@ const PatientDashboard: React.FC = () => {
     };
     return classMap[status as keyof typeof classMap] || classMap.pending;
   };
+
   const handleBookingClick = (doctor: Doctor) => {
     if (!doctor.available) return;
     navigate(`/appointments/book?doctorId=${doctor.id}`);
   };
+
   const handleBookingModal = (doctor: Doctor) => {
     setSelectedDoctor(doctor);
     setShowBooking(true);
@@ -277,16 +363,20 @@ const PatientDashboard: React.FC = () => {
     setCardInfo({ number: '', date: '', cvv: '' });
     setFormData({ reason: '', type: 'in_person', symptoms: '' });
   };
+
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
     setSelectedTime('');
   };
+
   const handleConfirmDoctor = () => {
     setBookingStep(2);
   };
+
   const handleConfirmTime = () => {
     if (selectedTime) setBookingStep(3);
   };
+
   const handlePayment = async () => {
     if (!cardInfo.number || !cardInfo.date || !cardInfo.cvv) {
       showNotification('Veuillez remplir tous les champs de paiement', 'error');
@@ -323,6 +413,7 @@ const PatientDashboard: React.FC = () => {
       showNotification('Erreur lors de la réservation. Veuillez réessayer.', 'error');
     }
   };
+
   const closeBooking = () => {
     setShowBooking(false);
     setSelectedDoctor(null);
@@ -333,6 +424,7 @@ const PatientDashboard: React.FC = () => {
     setCardInfo({ number: '', date: '', cvv: '' });
     setFormData({ reason: '', type: 'in_person', symptoms: '' });
   };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -340,6 +432,7 @@ const PatientDashboard: React.FC = () => {
       </div>
     );
   }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <header className="glass-nav sticky top-0 z-50">
@@ -367,20 +460,74 @@ const PatientDashboard: React.FC = () => {
                 </Link>
               </nav>
             </div>
+            
+            {/* ✅ SECTION MODIFIÉE - Photo de profil et infos utilisateur avec upload */}
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-sm">
-                    {user?.firstName?.[0]}{user?.lastName?.[0]}
-                  </span>
+              <div className="flex items-center space-x-3 relative group">
+                {/* Photo de profil avec upload */}
+                <div className="relative">
+                  <div 
+                    onClick={triggerFileInput}
+                    className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-lg cursor-pointer hover:opacity-90 transition overflow-hidden"
+                  >
+                    {user?.profilePicture ? (
+                      <img 
+                        src={`${user.profilePicture}?t=${Date.now()}`}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `<span class="text-white font-bold text-sm">${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}</span>`;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="text-white font-bold text-sm">
+                        {user?.firstName?.[0]}{user?.lastName?.[0]}
+                      </span>
+                    )}
+                    
+                    {/* Overlay de chargement */}
+                    {uploading && (
+                      <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Bouton caméra pour upload */}
+                  <button
+                    onClick={triggerFileInput}
+                    className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-1.5 shadow-lg hover:bg-blue-600 transition"
+                    disabled={uploading}
+                    title="Changer la photo"
+                  >
+                    <Camera size={12} className="text-white" />
+                  </button>
+                  
+                  {/* Input file caché */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureUpload}
+                    className="hidden"
+                    disabled={uploading}
+                  />
                 </div>
+                
+                {/* Infos utilisateur */}
                 <div className="hidden sm:block">
                   <p className="text-sm font-medium text-white">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-xs text-white/60">{user?.role}</p>
+                  <p className="text-xs text-white/60 capitalize">{user?.role}</p>
                 </div>
               </div>
+              
               <button
                 onClick={logout}
                 className="text-white/60 hover:text-white text-sm font-medium transition px-3 py-1 rounded-lg hover:bg-white/10"
@@ -391,20 +538,59 @@ const PatientDashboard: React.FC = () => {
           </div>
         </div>
       </header>
+
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="mb-12 animate-slide-in">
-          <h1 className="text-4xl font-black text-white mb-2 animate-float">
-            Bienvenue, {user?.firstName}
-          </h1>
-          <p className="text-lg text-white/60">
-            Gérez votre santé avec la plateforme médicale du futur
-          </p>
+        {/* ✅ SECTION MODIFIÉE - Message de bienvenue avec photo de profil */}
+        <div className="mb-12 animate-slide-in flex items-center gap-6">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-lg overflow-hidden border-4 border-white/20">
+              {user?.profilePicture ? (
+                <img 
+                  src={`${user.profilePicture}?t=${Date.now()}`}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `<span class="text-white font-bold text-2xl">${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}</span>`;
+                    }
+                  }}
+                />
+              ) : (
+                <span className="text-white font-bold text-2xl">
+                  {user?.firstName?.[0]}{user?.lastName?.[0]}
+                </span>
+              )}
+            </div>
+            
+            {/* Mini bouton pour changer la photo (optionnel) */}
+            <button
+              onClick={triggerFileInput}
+              className="absolute bottom-0 right-0 bg-blue-500 rounded-full p-1.5 shadow-lg hover:bg-blue-600 transition"
+              disabled={uploading}
+              title="Changer la photo"
+            >
+              <Camera size={14} className="text-white" />
+            </button>
+          </div>
+          <div>
+            <h1 className="text-4xl font-black text-white mb-2 animate-float">
+              Bienvenue, {user?.firstName}
+            </h1>
+            <p className="text-lg text-white/60">
+              Gérez votre santé avec la plateforme médicale du futur
+            </p>
+          </div>
         </div>
+
         {error && (
           <div className="futuristic-card p-4 mb-8 border-red-500/50 bg-red-500/10">
             <p className="text-red-300">{error}</p>
           </div>
         )}
+
         <div className="futuristic-card p-8 mb-12">
           <h2 className="text-2xl font-black gradient-text mb-8">
             Disponibilités des médecins
@@ -472,6 +658,7 @@ const PatientDashboard: React.FC = () => {
             </div>
           )}
         </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 futuristic-card p-8">
             <div className="flex justify-between items-center mb-8">
@@ -558,6 +745,7 @@ const PatientDashboard: React.FC = () => {
               </div>
             )}
           </div>
+
           <div className="futuristic-card p-8">
             <h2 className="text-2xl font-black gradient-text mb-8">
               Résumé Médical
@@ -611,6 +799,8 @@ const PatientDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de réservation (inchangé) */}
       {showBooking && selectedDoctor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -829,4 +1019,5 @@ const PatientDashboard: React.FC = () => {
     </div>
   );
 };
+
 export default PatientDashboard;
