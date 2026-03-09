@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/userService';
@@ -394,105 +395,119 @@ const DoctorDashboard: React.FC = () => {
                 )}
               </button>
 
-              {/* ── Dropdown notifications — FIXED pour passer au-dessus de tout ── */}
-              {showNotifDropdown && (
-                <div
-                  ref={notifRef}
-                  className="w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
-                  style={{
-                    position: 'fixed',
-                    top:      dropdownPos.top,
-                    right:    dropdownPos.right,
-                    zIndex:   99999,
-                    animation: 'notifDropIn 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards',
-                  }}
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-b border-white/10">
-                    <div className="flex items-center gap-2">
-                      <Bell className="w-4 h-4 text-yellow-400" />
-                      <span className="text-white font-bold text-sm">Notifications</span>
-                      {pendingAppointments.length > 0 && (
-                        <span className="bg-yellow-500 text-black text-xs font-black px-2 py-0.5 rounded-full">
-                          {pendingAppointments.length}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setShowNotifDropdown(false)}
-                      className="text-gray-500 hover:text-white transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
+              {/* Portail — rendu directement dans document.body, hors de tout stacking context */}
+              {showNotifDropdown && createPortal(
+                <>
+                  {/* Overlay invisible pour détecter le clic extérieur */}
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 99998 }}
+                    onClick={() => setShowNotifDropdown(false)}
+                  />
 
-                  {/* Liste des notifications */}
-                  <div className="max-h-72 overflow-y-auto">
-                    {pendingAppointments.length === 0 ? (
-                      <div className="py-10 text-center">
-                        <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-60" />
-                        <p className="text-gray-400 text-sm font-medium">Tout est à jour !</p>
-                        <p className="text-gray-600 text-xs mt-1">Aucun rendez-vous en attente</p>
+                  {/* Dropdown */}
+                  <div
+                    ref={notifRef}
+                    className="w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+                    style={{
+                      position:  'fixed',
+                      top:       dropdownPos.top,
+                      right:     dropdownPos.right,
+                      zIndex:    99999,
+                      animation: 'notifDropIn 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards',
+                    }}
+                  >
+                    <style>{`
+                      @keyframes notifDropIn {
+                        from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+                        to   { opacity: 1; transform: translateY(0) scale(1); }
+                      }
+                    `}</style>
+
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-yellow-400" />
+                        <span className="text-white font-bold text-sm">Notifications</span>
+                        {pendingAppointments.length > 0 && (
+                          <span className="bg-yellow-500 text-black text-xs font-black px-2 py-0.5 rounded-full">
+                            {pendingAppointments.length}
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      pendingAppointments.map(apt => {
-                        const { date, time } = formatDateTime(apt.appointmentDate);
-                        return (
-                          <div key={apt.id} className="px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors">
-                            <div className="flex items-start gap-3">
-                              {/* Avatar */}
-                              <div className="w-9 h-9 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
-                                <span className="text-white text-xs font-bold">
-                                  {apt.patient?.firstName?.[0]}{apt.patient?.lastName?.[0]}
-                                </span>
-                              </div>
-                              {/* Infos */}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-white text-sm font-semibold truncate">
-                                  {apt.patient?.firstName} {apt.patient?.lastName}
-                                </p>
-                                <p className="text-gray-400 text-xs truncate">{apt.reason}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-yellow-400 text-xs font-medium">{date}</span>
-                                  <span className="text-gray-600 text-xs">•</span>
-                                  <span className="text-gray-300 text-xs">{time}</span>
-                                </div>
-                              </div>
-                            </div>
-                            {/* Actions rapides */}
-                            <div className="flex gap-2 mt-2.5 ml-12">
-                              <button
-                                onClick={() => { handleConfirmAppointment(apt.id); setShowNotifDropdown(false); }}
-                                className="flex-1 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-all flex items-center justify-center gap-1"
-                              >
-                                <Check className="w-3 h-3" /> Confirmer
-                              </button>
-                              <button
-                                onClick={() => { handleCancelAppointment(apt.id); setShowNotifDropdown(false); }}
-                                className="flex-1 py-1.5 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all flex items-center justify-center gap-1"
-                              >
-                                <X className="w-3 h-3" /> Refuser
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Footer */}
-                  {pendingAppointments.length > 0 && (
-                    <div className="px-4 py-3 border-t border-white/10 bg-white/5">
                       <button
-                        onClick={() => { setFilter('pending'); setShowNotifDropdown(false); }}
-                        className="w-full text-center text-blue-400 hover:text-blue-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1"
+                        onClick={() => setShowNotifDropdown(false)}
+                        className="text-gray-500 hover:text-white transition-colors"
                       >
-                        Voir tous les rendez-vous en attente
-                        <ChevronRight className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
-                  )}
-                </div>
+
+                    {/* Liste */}
+                    <div className="max-h-72 overflow-y-auto">
+                      {pendingAppointments.length === 0 ? (
+                        <div className="py-10 text-center">
+                          <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-60" />
+                          <p className="text-gray-400 text-sm font-medium">Tout est à jour !</p>
+                          <p className="text-gray-600 text-xs mt-1">Aucun rendez-vous en attente</p>
+                        </div>
+                      ) : (
+                        pendingAppointments.map(apt => {
+                          const { date, time } = formatDateTime(apt.appointmentDate);
+                          return (
+                            <div key={apt.id} className="px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors">
+                              <div className="flex items-start gap-3">
+                                <div className="w-9 h-9 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                                  <span className="text-white text-xs font-bold">
+                                    {apt.patient?.firstName?.[0]}{apt.patient?.lastName?.[0]}
+                                  </span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-white text-sm font-semibold truncate">
+                                    {apt.patient?.firstName} {apt.patient?.lastName}
+                                  </p>
+                                  <p className="text-gray-400 text-xs truncate">{apt.reason}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-yellow-400 text-xs font-medium">{date}</span>
+                                    <span className="text-gray-600 text-xs">•</span>
+                                    <span className="text-gray-300 text-xs">{time}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 mt-2.5 ml-12">
+                                <button
+                                  onClick={() => { handleConfirmAppointment(apt.id); setShowNotifDropdown(false); }}
+                                  className="flex-1 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-all flex items-center justify-center gap-1"
+                                >
+                                  <Check className="w-3 h-3" /> Confirmer
+                                </button>
+                                <button
+                                  onClick={() => { handleCancelAppointment(apt.id); setShowNotifDropdown(false); }}
+                                  className="flex-1 py-1.5 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-all flex items-center justify-center gap-1"
+                                >
+                                  <X className="w-3 h-3" /> Refuser
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    {pendingAppointments.length > 0 && (
+                      <div className="px-4 py-3 border-t border-white/10 bg-white/5">
+                        <button
+                          onClick={() => { setFilter('pending'); setShowNotifDropdown(false); }}
+                          className="w-full text-center text-blue-400 hover:text-blue-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1"
+                        >
+                          Voir tous les rendez-vous en attente
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>,
+                document.body
               )}
             </div>
             {/* ══ FIN CLOCHE ══ */}
@@ -1030,13 +1045,6 @@ const DoctorDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Animation dropdown */}
-      <style>{`
-        @keyframes notifDropIn {
-          from { opacity: 0; transform: translateY(-10px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-      `}</style>
 
     </div>
   );
