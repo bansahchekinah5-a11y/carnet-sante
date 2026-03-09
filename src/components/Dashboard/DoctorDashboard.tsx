@@ -70,11 +70,28 @@ const DoctorDashboard: React.FC = () => {
 
   // ── 🔔 Notification dropdown ────────────────────────────────────────────────
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
+  const notifRef    = useRef<HTMLDivElement>(null);
+  const notifBtnRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
+
+  // Calcule la position du dropdown en fixed par rapport au bouton
+  const handleToggleDropdown = () => {
+    if (!showNotifDropdown && notifBtnRef.current) {
+      const rect = notifBtnRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top:   rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setShowNotifDropdown(prev => !prev);
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+      if (
+        notifRef.current && !notifRef.current.contains(e.target as Node) &&
+        notifBtnRef.current && !notifBtnRef.current.contains(e.target as Node)
+      ) {
         setShowNotifDropdown(false);
       }
     };
@@ -362,9 +379,10 @@ const DoctorDashboard: React.FC = () => {
           <div className="flex items-center gap-4">
 
             {/* ══ 🔔 CLOCHE CLIQUABLE ══ */}
-            <div className="relative" ref={notifRef}>
+            <div className="relative">
               <button
-                onClick={() => setShowNotifDropdown(prev => !prev)}
+                ref={notifBtnRef}
+                onClick={handleToggleDropdown}
                 className="relative p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300"
                 title={pendingAppointments.length > 0 ? `${pendingAppointments.length} rendez-vous en attente` : 'Aucune notification'}
               >
@@ -376,11 +394,18 @@ const DoctorDashboard: React.FC = () => {
                 )}
               </button>
 
-              {/* ── Dropdown notifications ── */}
+              {/* ── Dropdown notifications — FIXED pour passer au-dessus de tout ── */}
               {showNotifDropdown && (
                 <div
-                  className="absolute right-0 top-14 w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                  style={{ animation: 'notifDropIn 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards' }}
+                  ref={notifRef}
+                  className="w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+                  style={{
+                    position: 'fixed',
+                    top:      dropdownPos.top,
+                    right:    dropdownPos.right,
+                    zIndex:   99999,
+                    animation: 'notifDropIn 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards',
+                  }}
                 >
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-b border-white/10">
