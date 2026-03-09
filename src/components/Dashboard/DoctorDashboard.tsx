@@ -8,7 +8,7 @@ import { medicalFileService } from '../../services/medicalFileService';
 import {
   Calendar, Users, Clock, X, Check, Bell, ChevronRight,
   LogOut, Plus, Video, FileText, Pill, Search, Send,
-  Stethoscope, AlertCircle, CheckCircle2
+  Stethoscope, AlertCircle, CheckCircle2, Eye
 } from 'lucide-react';
 import { useNotification } from '../../context/NotificationContext';
 
@@ -18,7 +18,7 @@ interface Appointment {
   doctorId: string;
   appointmentDate: string;
   duration: number;
-  status: 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled' | 'no_show' | 'missed';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
   type: 'in_person' | 'teleconsultation' | 'home_visit';
   reason: string;
   patient: {
@@ -69,18 +69,28 @@ const DoctorDashboard: React.FC = () => {
   const [filter, setFilter]                           = useState<'today' | 'pending' | 'upcoming'>('pending');
   const [stats, setStats]                             = useState({ totalAppointments: 0, todayAppointments: 0, totalPatients: 0 });
 
-  // ── 🕐 Horloge — recalcule les statuts toutes les 30s ─────────────────────
+  // ── 🔔 Notification dropdown ────────────────────────────────────────────────
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifRef    = useRef<HTMLDivElement>(null);
+  const notifBtnRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
+
+  // Horloge temps réel pour les statuts calculés
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
 
-  // ── 🔔 Notification dropdown ────────────────────────────────────────────────
-  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-  const notifRef    = useRef<HTMLDivElement>(null);
-  const notifBtnRef = useRef<HTMLButtonElement>(null);
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
+  const getComputedStatus = (dbStatus: string, appointmentDate: string, duration: number = 30): string => {
+    if (['cancelled', 'no_show'].includes(dbStatus)) return dbStatus;
+    const start = new Date(appointmentDate).getTime();
+    const end   = start + (duration || 30) * 60 * 1000;
+    const t     = now.getTime();
+    if (t >= end)   return 'completed';
+    if (t >= start) return (dbStatus === 'confirmed' || dbStatus === 'ongoing') ? 'ongoing' : dbStatus;
+    return dbStatus;
+  };
 
   // Calcule la position du dropdown en fixed par rapport au bouton
   const handleToggleDropdown = () => {
@@ -143,8 +153,11 @@ const DoctorDashboard: React.FC = () => {
       setAppointmentsLoading(true);
       const data = await appointmentService.getAppointments();
       if (!data || !Array.isArray(data)) { setAppointments([]); return; }
-      const doctorAppointments = data.filter(apt =>
-        apt.doctorId === user?.id && apt.status !== 'completed' && apt.status !== 'cancelled'
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const doctorAppointments = data.filter((apt: any) =>
+        apt.doctorId === user?.id &&
+        apt.status !== 'cancelled' &&
+        new Date(apt.appointmentDate) >= thirtyDaysAgo
       );
       setAppointments(doctorAppointments);
     } catch { showNotification('Erreur lors du chargement des rendez-vous', 'error'); }
@@ -312,43 +325,6 @@ const DoctorDashboard: React.FC = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   // HELPERS
   // ─────────────────────────────────────────────────────────────────────────────
-
-  // ── 🔄 Calcul dynamique du statut affiché (anticipation côté client) ────────
-  const getComputedStatus = (
-    dbStatus: string,
-    appointmentDate: string,
-    duration: number = 30
-  ): string => {
-    if (['cancelled', 'no_show'].includes(dbStatus)) return dbStatus;
-
-    const start = new Date(appointmentDate).getTime();
-    const end   = start + (duration || 30) * 60 * 1000;
-    const t     = now.getTime();
-
-    if (t >= end)   return 'completed';
-    if (t >= start) return (dbStatus === 'confirmed' || dbStatus === 'ongoing') ? 'ongoing' : dbStatus;
-    return dbStatus;
-  };
-
-  const getStatusLabel = (status: string): string => ({
-    pending:   '⏳ En attente',
-    confirmed: '✅ Confirmé',
-    ongoing:   '🔵 En cours',
-    completed: '☑️ Terminé',
-    cancelled: '❌ Annulé',
-    no_show:   '👻 Non honoré',
-    missed:    '⚠️ Manqué',
-  }[status] ?? status);
-
-  const getStatusBadgeClass = (status: string): string => ({
-    pending:   'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30',
-    confirmed: 'bg-green-500/20  text-green-300  border border-green-500/30',
-    ongoing:   'bg-blue-500/20   text-blue-200   border border-blue-400/40 animate-pulse',
-    completed: 'bg-gray-500/20   text-gray-300   border border-gray-500/30',
-    cancelled: 'bg-red-500/20    text-red-300    border border-red-500/30',
-    no_show:   'bg-orange-500/20 text-orange-300 border border-orange-500/30',
-    missed:    'bg-red-700/20    text-red-400    border border-red-700/30',
-  }[status] ?? 'bg-gray-500/20 text-gray-300 border border-gray-500/30');
 
   const filteredAppointments = appointments.filter(apt => {
     const now = new Date();
@@ -773,16 +749,20 @@ const DoctorDashboard: React.FC = () => {
                   const computed = getComputedStatus(apt.status, apt.appointmentDate, apt.duration);
                   return (
                     <div key={apt.id} className={`p-4 bg-white/5 border rounded-xl hover:bg-white/10 transition-all ${
-                      computed === 'pending'   ? 'border-yellow-500/30 hover:border-yellow-500/50'
-                      : computed === 'ongoing'  ? 'border-blue-400/50 shadow-lg shadow-blue-500/10'
-                      : computed === 'confirmed'? 'border-green-500/30 hover:border-green-500/50'
-                      : 'border-white/10 hover:border-white/30'
+                      computed === 'ongoing'
+                        ? 'border-cyan-400/50 shadow-md shadow-cyan-500/10'
+                        : computed === 'pending'
+                        ? 'border-yellow-500/30 hover:border-yellow-500/50'
+                        : computed === 'confirmed'
+                        ? 'border-green-500/30 hover:border-green-500/50'
+                        : computed === 'completed'
+                        ? 'border-gray-500/20 hover:border-gray-500/40'
+                        : 'border-white/10 hover:border-white/30'
                     }`}>
-                      {/* Bandeau "En cours" */}
                       {computed === 'ongoing' && (
-                        <div className="flex items-center gap-2 mb-3 px-3 py-1.5 bg-blue-500/20 border border-blue-400/30 rounded-lg">
-                          <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping shrink-0" />
-                          <span className="text-blue-200 text-xs font-bold tracking-wider uppercase">Consultation en cours</span>
+                        <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 bg-cyan-500/20 border border-cyan-400/30 rounded-lg">
+                          <span className="w-2 h-2 bg-cyan-400 rounded-full animate-ping shrink-0" />
+                          <span className="text-cyan-200 text-xs font-bold tracking-wider uppercase">En cours</span>
                         </div>
                       )}
                       <div className="flex items-start justify-between gap-4">
@@ -818,12 +798,25 @@ const DoctorDashboard: React.FC = () => {
                             <p className="text-xs text-gray-400 mb-1">Motif</p>
                             <p className="text-white text-sm truncate">{apt.reason}</p>
                           </div>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${getStatusBadgeClass(computed)}`}>
-                            {getStatusLabel(computed)}
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                            computed === 'pending'   ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30' :
+                            computed === 'confirmed' ? 'bg-green-500/20  text-green-300  border border-green-500/30' :
+                            computed === 'ongoing'   ? 'bg-cyan-400/30   text-cyan-100   border border-cyan-400/50' :
+                            computed === 'completed' ? 'bg-gray-500/20   text-gray-300   border border-gray-500/30' :
+                            computed === 'missed'    ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' :
+                            'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          }`}>
+                            {computed === 'pending'   ? '⏳ En attente' :
+                             computed === 'confirmed' ? '✅ Confirmé' :
+                             computed === 'ongoing'   ? '🔵 En cours' :
+                             computed === 'completed' ? '☑️ Terminé' :
+                             computed === 'missed'    ? '⚠️ Manqué' :
+                             computed === 'no_show'   ? '👻 Non honoré' :
+                             computed}
                           </span>
                         </div>
                         <div className="flex flex-col gap-2 shrink-0">
-                          {apt.status === 'pending' && (
+                          {computed === 'pending' && (
                             <>
                               <button
                                 onClick={() => handleConfirmAppointment(apt.id)}
@@ -839,7 +832,7 @@ const DoctorDashboard: React.FC = () => {
                               </button>
                             </>
                           )}
-                          {(apt.status === 'confirmed' || computed === 'ongoing') && (
+                          {computed === 'confirmed' || computed === 'ongoing' ? (
                             <>
                               <button
                                 onClick={() => openPrescription(apt.patient, apt.id)}
@@ -860,15 +853,14 @@ const DoctorDashboard: React.FC = () => {
                                 Détails <ChevronRight className="w-3 h-3" />
                               </Link>
                             </>
-                          )}
-                          {computed === 'completed' && (
+                          ) : computed === 'completed' ? (
                             <Link
                               to={`/appointments/${apt.id}`}
-                              className="px-3 py-1.5 bg-gray-500/20 border border-gray-400/30 text-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                              className="px-3 py-1.5 bg-white/10 border border-white/20 text-white rounded-lg text-xs font-semibold hover:bg-white/20 transition-all flex items-center gap-1.5 whitespace-nowrap"
                             >
-                              <CheckCircle2 className="w-3 h-3" /> Voir détail
+                              <Eye className="w-3 h-3" /> Voir détail
                             </Link>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>
