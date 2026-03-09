@@ -120,14 +120,14 @@ const DoctorDashboard: React.FC = () => {
   const [videoLoading, setVideoLoading]                 = useState(false);
   const [videoSearchPatient, setVideoSearchPatient]     = useState('');
 
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
   // ─────────────────────────────────────────────────────────────────────────────
   // DATA FETCHING
   // ─────────────────────────────────────────────────────────────────────────────
 
   const handleLogout = () => {
-    if (window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
-      try { logout(); } catch { showNotification('❌ Erreur lors de la déconnexion', 'error'); }
-    }
+    try { logout(); } catch { showNotification('❌ Erreur lors de la déconnexion', 'error'); }
   };
 
   const fetchAppointments = async () => {
@@ -512,7 +512,7 @@ const DoctorDashboard: React.FC = () => {
             </div>
             {/* ══ FIN CLOCHE ══ */}
 
-            <button onClick={handleLogout} className="futuristic-btn-secondary flex items-center gap-2 hover:scale-105">
+            <button onClick={() => setShowLogoutModal(true)} className="futuristic-btn-secondary flex items-center gap-2 hover:scale-105">
               <LogOut className="w-5 h-5" />
               <span className="font-semibold">Déconnexion</span>
             </button>
@@ -1043,6 +1043,57 @@ const DoctorDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {/* ══════════════════ MODAL DÉCONNEXION ══════════════════ */}
+      {showLogoutModal && createPortal(
+        <div
+          className="flex items-center justify-center"
+          style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
+        >
+          <div
+            className="bg-gray-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden w-full max-w-sm mx-4"
+            style={{ animation: 'notifDropIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards' }}
+          >
+            <style>{`
+              @keyframes notifDropIn {
+                from { opacity: 0; transform: scale(0.88) translateY(20px); }
+                to   { opacity: 1; transform: scale(1) translateY(0); }
+              }
+            `}</style>
+
+            {/* Icône */}
+            <div className="flex flex-col items-center pt-8 pb-4 px-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-500/20 to-pink-500/20 border border-red-500/30 rounded-2xl flex items-center justify-center mb-4">
+                <LogOut className="w-8 h-8 text-red-400" />
+              </div>
+              <h2 className="text-xl font-black text-white mb-2">Déconnexion</h2>
+              <p className="text-gray-400 text-sm text-center leading-relaxed">
+                Êtes-vous sûr de vouloir vous déconnecter ?<br />
+                <span className="text-gray-500 text-xs">Vous devrez vous reconnecter pour accéder à votre tableau de bord.</span>
+              </p>
+            </div>
+
+            {/* Séparateur */}
+            <div className="border-t border-white/10 mx-6" />
+
+            {/* Boutons */}
+            <div className="flex gap-3 p-5">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-3 bg-white/5 border border-white/10 text-gray-300 rounded-xl font-bold hover:bg-white/10 transition-all text-sm"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => { setShowLogoutModal(false); handleLogout(); }}
+                className="flex-1 py-3 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] text-sm"
+              >
+                <LogOut className="w-4 h-4" /> Se déconnecter
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
 
