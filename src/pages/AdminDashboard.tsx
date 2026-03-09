@@ -191,15 +191,19 @@ const AdminDashboard: React.FC = () => {
   /** Calcule le statut affiché en anticipant côté client (le scheduler backend
    *  met à jour toutes les minutes, le frontend anticipe visuellement). */
   const getComputedStatus = (dbStatus: string, appointmentDate?: string, duration: number = 30): string => {
+    // Statuts finaux immuables — on ne recalcule pas le temps
+    if (['cancelled', 'no_show'].includes(dbStatus)) return dbStatus;
     if (!appointmentDate) return dbStatus;
-    if (['cancelled', 'no_show', 'missed', 'completed'].includes(dbStatus)) return dbStatus;
+
     const start = new Date(appointmentDate).getTime();
-    const end   = start + duration * 60 * 1000;
+    const end   = start + (duration || 30) * 60 * 1000;
     const t     = now.getTime();
-    if (dbStatus === 'confirmed' || dbStatus === 'ongoing') {
-      if (t >= end)   return 'completed';
-      if (t >= start) return 'ongoing';
-    }
+
+    // Si l'heure de fin est passée → Terminé (quel que soit le statut DB)
+    if (t >= end)   return 'completed';
+    // Si on est dans la plage horaire → En cours (seulement si déjà confirmé ou en cours)
+    if (t >= start) return (dbStatus === 'confirmed' || dbStatus === 'ongoing') ? 'ongoing' : dbStatus;
+    // RDV futur → on retourne le statut DB tel quel (pending, confirmed…)
     return dbStatus;
   };
 
