@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { adminService, DashboardStats } from '../services/adminService';
 import { calendarService } from '../services/calendarService';
 import UserManagement from '../components/Admin/UserManagement';
@@ -180,6 +180,47 @@ const AdminDashboard: React.FC = () => {
   const [dashLoading, setDashLoading]   = useState(true);
   const [tabLoading, setTabLoading]     = useState(false);
   const [tabError, setTabError]         = useState<string | null>(null);
+
+  // ── 🕐 Horloge temps réel — recalcule les statuts toutes les 30s ──────────
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  /** Calcule le statut affiché en anticipant côté client (le scheduler backend
+   *  met à jour toutes les minutes, le frontend anticipe visuellement). */
+  const getComputedStatus = (dbStatus: string, appointmentDate?: string, duration: number = 30): string => {
+    if (!appointmentDate) return dbStatus;
+    if (['cancelled', 'no_show', 'missed', 'completed'].includes(dbStatus)) return dbStatus;
+    const start = new Date(appointmentDate).getTime();
+    const end   = start + duration * 60 * 1000;
+    const t     = now.getTime();
+    if (dbStatus === 'confirmed' || dbStatus === 'ongoing') {
+      if (t >= end)   return 'completed';
+      if (t >= start) return 'ongoing';
+    }
+    return dbStatus;
+  };
+
+  const COMPUTED_STATUS_LABEL: Record<string, string> = {
+    pending:   'En attente',
+    confirmed: 'Confirmé',
+    ongoing:   '🔵 En cours',
+    completed: 'Terminé',
+    cancelled: 'Annulé',
+    no_show:   'Absent',
+    missed:    'Manqué',
+  };
+  const COMPUTED_STATUS_STYLE: Record<string, string> = {
+    pending:   'bg-yellow-100 text-yellow-700 border-yellow-200',
+    confirmed: 'bg-green-100  text-green-700  border-green-200',
+    ongoing:   'bg-blue-100   text-blue-700   border-blue-200   animate-pulse',
+    completed: 'bg-gray-100   text-gray-600   border-gray-200',
+    cancelled: 'bg-red-100    text-red-700    border-red-200',
+    no_show:   'bg-gray-100   text-gray-500   border-gray-200',
+    missed:    'bg-orange-100 text-orange-700 border-orange-200',
+  };
 
   // ── Filtres ──
   const [apptFilter,  setApptFilter]  = useState('');
@@ -360,7 +401,8 @@ const AdminDashboard: React.FC = () => {
 
   // ── Données filtrées ──────────────────────────────────────────────────────
   const APPT_STATUS_LABELS: Record<string,string> = {
-    pending:'En attente', confirmed:'Confirmé', completed:'Terminé', cancelled:'Annulé', no_show:'Absent'
+    pending:'En attente', confirmed:'Confirmé', ongoing:'En cours',
+    completed:'Terminé', cancelled:'Annulé', no_show:'Absent', missed:'Manqué'
   };
   const fAppts = (appointments || []).filter(a => {
     const q = apptFilter.toLowerCase();
@@ -680,9 +722,9 @@ const AdminDashboard: React.FC = () => {
                 </div>
               ) : (
               <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
-                <table className="w-full min-w-[750px]">
+                <table className="w-full min-w-[850px]">
                   <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>{['Date & Heure','Médecin','Patient','Type','Motif','Durée','Statut'].map(h=>(
+                    <tr>{['Date & Heure','Médecin','Patient','Type','Motif','Durée','Statut','Action'].map(h=>(
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                     ))}</tr>
                   </thead>
@@ -692,16 +734,10 @@ const AdminDashboard: React.FC = () => {
                       const dateStr = dt ? dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
                       const timeStr = dt ? dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '—';
                       const typeLabels: Record<string,string> = {in_person:'Présentiel',teleconsultation:'Téléconsult.',home_visit:'Domicile'};
-                      const statusStyle: Record<string,string> = {
-                        pending:'bg-yellow-100 text-yellow-700 border-yellow-200',
-                        confirmed:'bg-green-100 text-green-700 border-green-200',
-                        completed:'bg-blue-100 text-blue-700 border-blue-200',
-                        cancelled:'bg-red-100 text-red-700 border-red-200',
-                        no_show:'bg-gray-100 text-gray-600 border-gray-200',
-                      };
-                      const statusLabel: Record<string,string> = {pending:'En attente',confirmed:'Confirmé',completed:'Terminé',cancelled:'Annulé',no_show:'Absent'};
+                      // ── Statut calculé dynamiquement ──────────────────────
+                      const computed = getComputedStatus(a.status, a.appointmentDate, a.duration);
                       return (
-                        <tr key={a.id} className="hover:bg-gray-50 transition">
+                        <tr key={a.id} className={`hover:bg-gray-50 transition ${computed === 'ongoing' ? 'bg-blue-50/40' : ''}`}>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <p className="text-sm font-semibold text-gray-900">{dateStr}</p>
                             <p className="text-xs text-gray-500 flex items-center gap-1"><Clock className="w-3 h-3"/>{timeStr}</p>
@@ -727,9 +763,24 @@ const AdminDashboard: React.FC = () => {
                             {a.duration ? `${a.duration} min` : '—'}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${statusStyle[a.status]||statusStyle.pending}`}>
-                              {statusLabel[a.status]||a.status}
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${COMPUTED_STATUS_STYLE[computed] || COMPUTED_STATUS_STYLE.pending}`}>
+                              {COMPUTED_STATUS_LABEL[computed] || computed}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Link
+                              to={`/appointments/${a.id}`}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap ${
+                                computed === 'completed'
+                                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                  : computed === 'ongoing'
+                                  ? 'bg-cyan-50 text-cyan-600 border-cyan-200 hover:bg-cyan-100 animate-pulse'
+                                  : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                              }`}
+                            >
+                              <Eye className="w-3.5 h-3.5"/>
+                              {computed === 'ongoing' ? 'En cours' : 'Voir détail'}
+                            </Link>
                           </td>
                         </tr>
                       );
