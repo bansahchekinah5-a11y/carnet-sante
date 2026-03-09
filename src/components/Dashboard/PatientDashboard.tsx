@@ -30,7 +30,7 @@ interface Appointment {
   doctor: { firstName: string; lastName: string; specialty: string };
   appointmentDate: string;
   duration: number;
-  status: 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled' | 'no_show' | 'missed';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
   type: 'in_person' | 'teleconsultation' | 'home_visit';
   reason: string;
 }
@@ -75,44 +75,24 @@ const PatientDashboard: React.FC = () => {
     conditions: 1,
   };
 
-  // ── 🕐 Horloge — recalcule les statuts toutes les 30s ─────────────────────
+  // Horloge temps réel – recalcule les statuts toutes les 30s
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
 
+  // Calcule le statut RÉEL à partir de la date/heure du RDV
+  // (le statut en BDD peut être en retard sur la réalité)
   const getComputedStatus = (dbStatus: string, appointmentDate: string, duration: number = 30): string => {
     if (['cancelled', 'no_show'].includes(dbStatus)) return dbStatus;
-
     const start = new Date(appointmentDate).getTime();
     const end   = start + (duration || 30) * 60 * 1000;
     const t     = now.getTime();
-
     if (t >= end)   return 'completed';
     if (t >= start) return (dbStatus === 'confirmed' || dbStatus === 'ongoing') ? 'ongoing' : dbStatus;
     return dbStatus;
   };
-
-  const getStatusText = (status: string): string => ({
-    pending:   '⏳ En attente',
-    confirmed: '✅ Confirmé',
-    ongoing:   '🔵 En cours',
-    completed: '☑️ Terminé',
-    cancelled: '❌ Annulé',
-    no_show:   '👻 Non honoré',
-    missed:    '⚠️ Manqué',
-  }[status] ?? status);
-
-  const getStatusClass = (status: string): string => ({
-    pending:   'bg-blue-500/20   text-blue-300   border border-blue-500/30',
-    confirmed: 'bg-green-500/20  text-green-300  border border-green-500/30',
-    ongoing:   'bg-blue-400/30   text-blue-100   border border-blue-300/50 animate-pulse',
-    completed: 'bg-gray-500/20   text-gray-300   border border-gray-500/30',
-    cancelled: 'bg-red-500/20    text-red-300    border border-red-500/30',
-    no_show:   'bg-orange-500/20 text-orange-300 border border-orange-500/30',
-    missed:    'bg-red-700/20    text-red-400    border border-red-700/30',
-  }[status] ?? 'bg-blue-500/20 text-blue-300 border border-blue-500/30');
 
   const generateDates = () => {
     const dates = [];
@@ -246,28 +226,23 @@ const PatientDashboard: React.FC = () => {
         };
       });
 
-      console.log('🔄 Filtrage des rendez-vous...');
-      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-      const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS);
-
+      // Garde tous les RDV des 30 derniers jours + les futurs (sauf annulés)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const upcoming = transformedAppointments.filter(apt => {
         try {
-          const appointmentDate = new Date(apt.appointmentDate);
-          const isValidDate = !isNaN(appointmentDate.getTime());
-          // On exclut seulement : dates invalides, annulés, et vieux de plus de 30 jours
-          const notTooOld = appointmentDate >= thirtyDaysAgo;
+          const aptDate = new Date(apt.appointmentDate);
+          const isValidDate = !isNaN(aptDate.getTime());
+          const notTooOld    = aptDate >= thirtyDaysAgo;
           const notCancelled = apt.status !== 'cancelled';
           return isValidDate && notTooOld && notCancelled;
-        } catch (error) {
-          console.warn('❌ Date de rendez-vous invalide:', apt.appointmentDate);
+        } catch {
           return false;
         }
       });
+      // Tri : plus récent en premier
+      upcoming.sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime());
 
-      // Tri : en cours et à venir en premier, puis les terminés récents
-      upcoming.sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
-
-      console.log('✅ Rendez-vous filtrés:', upcoming);
+      console.log('✅ Rendez-vous chargés:', upcoming.length);
       setUpcomingAppointments(upcoming);
     } catch (err) {
       console.error('❌ Erreur lors du chargement des rendez-vous:', err);
@@ -367,6 +342,26 @@ const PatientDashboard: React.FC = () => {
       return 'Heure invalide';
     }
   };
+
+  const getStatusText = (status: string): string => ({
+    pending:   '⏳ En attente',
+    confirmed: '✅ Confirmé',
+    ongoing:   '🔵 En cours',
+    completed: '☑️ Terminé',
+    cancelled: '❌ Annulé',
+    no_show:   '👻 Non honoré',
+    missed:    '⚠️ Manqué',
+  }[status] ?? status);
+
+  const getStatusClass = (status: string): string => ({
+    pending:   'bg-blue-500/20   text-blue-300   border border-blue-500/30',
+    confirmed: 'bg-green-500/20  text-green-300  border border-green-500/30',
+    ongoing:   'bg-cyan-400/30   text-cyan-100   border border-cyan-400/50',
+    completed: 'bg-gray-500/20   text-gray-300   border border-gray-500/30',
+    cancelled: 'bg-red-500/20    text-red-300    border border-red-500/30',
+    no_show:   'bg-orange-500/20 text-orange-300 border border-orange-500/30',
+    missed:    'bg-red-700/20    text-red-400    border border-red-700/30',
+  }[status] ?? 'bg-blue-500/20 text-blue-300 border border-blue-500/30');
 
   const handleBookingClick = (doctor: Doctor) => {
     if (!doctor.available) return;
@@ -683,12 +678,12 @@ const PatientDashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
 
-            {/* ── Rendez-vous à venir / en cours ─────────────────────────── */}
+            {/* ── Rendez-vous à venir / en cours ── */}
             <div className="futuristic-card p-8">
               <div className="flex justify-between items-center mb-8">
                 <div>
                   <h2 className="text-2xl font-black gradient-text">Rendez-vous à venir</h2>
-                  <p className="text-white/60 text-sm mt-1">Vos consultations planifiées et en cours</p>
+                  <p className="text-white/60 text-sm mt-1">Vos consultations planifiées</p>
                 </div>
                 <Link to="/appointments" className="text-blue-400 hover:text-blue-300 text-sm font-semibold transition">
                   Voir tout →
@@ -699,49 +694,42 @@ const PatientDashboard: React.FC = () => {
                   <p className="text-white/50 text-lg">Chargement des rendez-vous...</p>
                 </div>
               ) : (() => {
-                const activeApts = upcomingAppointments.filter(apt => {
-                  const s = getComputedStatus(apt.status, apt.appointmentDate, apt.duration);
-                  return ['pending', 'confirmed', 'ongoing'].includes(s);
-                });
-                return activeApts.length === 0 ? (
+                const activeList = upcomingAppointments.filter(apt =>
+                  ['pending', 'confirmed', 'ongoing'].includes(
+                    getComputedStatus(apt.status, apt.appointmentDate, apt.duration)
+                  )
+                );
+                return activeList.length === 0 ? (
                   <div className="text-center py-12">
                     <p className="text-white/50 text-lg">Aucun rendez-vous à venir</p>
-                    <Link
-                      to="/appointments/book"
-                      className="inline-block mt-4 px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition"
-                    >
+                    <Link to="/appointments/book"
+                      className="inline-block mt-4 px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition">
                       Prendre un rendez-vous
                     </Link>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {activeApts.map((appointment) => {
+                    {activeList.map((appointment) => {
                       const computed = getComputedStatus(appointment.status, appointment.appointmentDate, appointment.duration);
                       return (
-                        <div
-                          key={appointment.id}
+                        <div key={appointment.id}
                           className={`bg-white/5 border rounded-xl p-5 transition duration-300 ${
                             computed === 'ongoing'
-                              ? 'border-blue-400/50 shadow-lg shadow-blue-500/10'
-                              : 'border-white/10 hover:bg-white/10 hover:border-white/20'
-                          }`}
-                        >
+                              ? 'border-cyan-400/50 shadow-lg shadow-cyan-500/10'
+                              : 'border-white/10 hover:bg-white/10 hover:border-white/20 cursor-pointer'
+                          }`}>
                           {computed === 'ongoing' && (
-                            <div className="flex items-center gap-2 mb-3 px-3 py-1.5 bg-blue-500/20 border border-blue-400/30 rounded-lg">
-                              <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping shrink-0" />
-                              <span className="text-blue-200 text-xs font-bold tracking-wider uppercase">Consultation en cours</span>
+                            <div className="flex items-center gap-2 mb-3 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 rounded-lg">
+                              <span className="w-2 h-2 bg-cyan-400 rounded-full animate-ping shrink-0" />
+                              <span className="text-cyan-200 text-xs font-bold tracking-wider uppercase">Consultation en cours</span>
                             </div>
                           )}
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center space-x-3 mb-2">
-                                <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-lg">
-                                  👨‍⚕️
-                                </div>
+                                <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-lg">👨‍⚕️</div>
                                 <div>
-                                  <p className="font-semibold text-white">
-                                    Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}
-                                  </p>
+                                  <p className="font-semibold text-white">Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}</p>
                                   <p className="text-xs text-white/60">{appointment.doctor.specialty}</p>
                                 </div>
                               </div>
@@ -758,19 +746,13 @@ const PatientDashboard: React.FC = () => {
                                       appointment.type === 'home_visit' ? 'Visite à domicile' : 'En personne'}
                               </p>
                             </div>
-                            <div className="flex flex-col items-end gap-2">
+                            <div className="flex flex-col items-end gap-2 ml-3">
                               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusClass(computed)}`}>
                                 {getStatusText(computed)}
                               </span>
-                              <Link
-                                to={`/appointments/${appointment.id}`}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                                  computed === 'ongoing'
-                                    ? 'bg-blue-400/20 text-blue-200 border-blue-400/30 hover:bg-blue-400/30 animate-pulse'
-                                    : 'text-blue-400 border-transparent hover:text-blue-300'
-                                }`}
-                              >
-                                {computed === 'ongoing' ? '▶ En cours' : '👁 Voir détail'}
+                              <Link to={`/appointments/${appointment.id}`}
+                                className="text-blue-400 hover:text-blue-300 text-sm font-medium transition">
+                                Détails →
                               </Link>
                             </div>
                           </div>
@@ -782,38 +764,34 @@ const PatientDashboard: React.FC = () => {
               })()}
             </div>
 
-            {/* ── Historique des consultations ────────────────────────────── */}
+            {/* ── Historique des consultations ── */}
             {(() => {
-              const history = upcomingAppointments.filter(apt => {
-                const s = getComputedStatus(apt.status, apt.appointmentDate, apt.duration);
-                return ['completed', 'missed', 'no_show'].includes(s);
-              }).sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime());
-
-              if (history.length === 0) return null;
-
+              const historyList = upcomingAppointments
+                .filter(apt =>
+                  ['completed', 'missed', 'no_show'].includes(
+                    getComputedStatus(apt.status, apt.appointmentDate, apt.duration)
+                  )
+                );
+              if (historyList.length === 0) return null;
               return (
                 <div className="futuristic-card p-8">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h2 className="text-2xl font-black gradient-text">Historique</h2>
-                      <p className="text-white/60 text-sm mt-1">{history.length} consultation{history.length > 1 ? 's' : ''} passée{history.length > 1 ? 's' : ''}</p>
-                    </div>
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-black gradient-text">Historique</h2>
+                    <p className="text-white/60 text-sm mt-1">
+                      {historyList.length} consultation{historyList.length > 1 ? 's' : ''} passée{historyList.length > 1 ? 's' : ''}
+                    </p>
                   </div>
                   <div className="space-y-3">
-                    {history.map((appointment) => {
+                    {historyList.map((appointment) => {
                       const computed = getComputedStatus(appointment.status, appointment.appointmentDate, appointment.duration);
                       return (
-                        <div
-                          key={appointment.id}
-                          className="bg-white/3 border border-white/8 rounded-xl p-4 hover:bg-white/8 transition duration-200"
-                        >
+                        <div key={appointment.id}
+                          className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition duration-200">
                           <div className="flex items-center justify-between gap-4">
-                            {/* Icône + infos médecin */}
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-base shrink-0 ${
                                 computed === 'completed' ? 'bg-gray-500/30' :
-                                computed === 'missed'    ? 'bg-orange-500/20' :
-                                'bg-red-500/20'
+                                computed === 'missed'    ? 'bg-orange-500/20' : 'bg-red-500/20'
                               }`}>
                                 {computed === 'completed' ? '✅' : computed === 'missed' ? '⚠️' : '👻'}
                               </div>
@@ -821,31 +799,25 @@ const PatientDashboard: React.FC = () => {
                                 <p className="font-semibold text-white text-sm truncate">
                                   Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}
                                 </p>
-                                <p className="text-white/50 text-xs truncate">{appointment.doctor.specialty}</p>
+                                <p className="text-white/50 text-xs">{appointment.doctor.specialty}</p>
                               </div>
                             </div>
-                            {/* Date + heure */}
                             <div className="text-right shrink-0 hidden sm:block">
                               <p className="text-white/70 text-xs">{formatAppointmentDate(appointment.appointmentDate)}</p>
                               <p className="text-white/40 text-xs">{formatAppointmentTime(appointment.appointmentDate)} · {appointment.duration} min</p>
                             </div>
-                            {/* Statut + lien */}
                             <div className="flex flex-col items-end gap-1.5 shrink-0">
                               <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${getStatusClass(computed)}`}>
                                 {getStatusText(computed)}
                               </span>
-                              <Link
-                                to={`/appointments/${appointment.id}`}
-                                className="text-xs text-white/40 hover:text-white/70 transition underline underline-offset-2"
-                              >
+                              <Link to={`/appointments/${appointment.id}`}
+                                className="text-xs text-white/40 hover:text-white/70 transition underline underline-offset-2">
                                 Voir détail
                               </Link>
                             </div>
                           </div>
                           {appointment.reason && (
-                            <p className="text-white/40 text-xs mt-2 ml-13 pl-1 truncate">
-                              Motif : {appointment.reason}
-                            </p>
+                            <p className="text-white/40 text-xs mt-2 pl-13 truncate">Motif : {appointment.reason}</p>
                           )}
                         </div>
                       );
@@ -886,17 +858,19 @@ const PatientDashboard: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-white/60">Consultations terminées</span>
                   <span className="text-white font-medium">
-                    {upcomingAppointments.filter(a => getComputedStatus(a.status, a.appointmentDate, a.duration) === 'completed').length}
+                    {upcomingAppointments.filter(a =>
+                      getComputedStatus(a.status, a.appointmentDate, a.duration) === 'completed'
+                    ).length}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/60">Prochain RDV</span>
-                  <span className="text-white font-medium text-right">
+                  <span className="text-white font-medium text-xs text-right">
                     {(() => {
-                      const next = upcomingAppointments.find(a => {
-                        const s = getComputedStatus(a.status, a.appointmentDate, a.duration);
-                        return ['pending', 'confirmed'].includes(s);
-                      });
+                      const t = now.getTime();
+                      const next = [...upcomingAppointments]
+                        .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime())
+                        .find(a => new Date(a.appointmentDate).getTime() > t && ['pending','confirmed'].includes(a.status));
                       return next ? formatAppointmentDate(next.appointmentDate) : 'Aucun';
                     })()}
                   </span>
