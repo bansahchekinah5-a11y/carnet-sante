@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Users, Calendar, CreditCard, Activity, Trash, Eye,
   Search, BarChart3, Settings, LogOut, Bell, TrendingUp,
@@ -202,6 +203,34 @@ const AdminDashboard: React.FC = () => {
   // ── Modal prescription ──
   const [selectedPresc, setSelectedPresc] = useState<AdminPrescription | null>(null);
 
+  // ── Modal déconnexion ──
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // ── Dropdown notifications ──
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifBtnRef = useRef<HTMLButtonElement>(null);
+  const notifRef    = useRef<HTMLDivElement>(null);
+  const [notifPos,  setNotifPos]  = useState({ top: 0, right: 0 });
+
+  const handleToggleNotif = () => {
+    if (!showNotifDropdown && notifBtnRef.current) {
+      const rect = notifBtnRef.current.getBoundingClientRect();
+      setNotifPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    }
+    setShowNotifDropdown(prev => !prev);
+  };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        notifRef.current && !notifRef.current.contains(e.target as Node) &&
+        notifBtnRef.current && !notifBtnRef.current.contains(e.target as Node)
+      ) setShowNotifDropdown(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   // ── Fetch dashboard ───────────────────────────────────────────────────────
   const fetchDashboard = useCallback(async () => {
     try {
@@ -326,7 +355,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Vous déconnecter ?')) { logout(); navigate('/login'); }
+    logout(); navigate('/login');
   };
 
   // ── Données filtrées ──────────────────────────────────────────────────────
@@ -381,11 +410,28 @@ const AdminDashboard: React.FC = () => {
             <button onClick={fetchDashboard} title="Actualiser" className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
               <RefreshCw className="w-4 h-4 text-gray-600" />
             </button>
+
+            {/* 🔔 Cloche cliquable */}
             <div className="relative">
-              <button className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"><Bell className="w-5 h-5 text-gray-600"/></button>
-              {pendingPayCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse">{pendingPayCount}</span>}
+              <button
+                ref={notifBtnRef}
+                onClick={handleToggleNotif}
+                className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                title={pendingPayCount > 0 ? `${pendingPayCount} paiement(s) en attente` : 'Aucune notification'}
+              >
+                <Bell className="w-5 h-5 text-gray-600"/>
+              </button>
+              {pendingPayCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse">
+                  {pendingPayCount}
+                </span>
+              )}
             </div>
-            <button onClick={handleLogout} className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm font-medium shadow-md transition-all">
+
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm font-medium shadow-md transition-all"
+            >
               <LogOut className="w-4 h-4"/> Déconnexion
             </button>
           </div>
@@ -594,24 +640,15 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
-                <select 
-                  value={apptStatus} 
-                  onChange={e=>setApptStatus(e.target.value)}
-                  className="admin-select w-auto"
-                >
+                <select value={apptStatus} onChange={e=>setApptStatus(e.target.value)}
+                  className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white">
                   <option value="">Tous les statuts</option>
                   {Object.entries(APPT_STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
                 </select>
-                <div className="admin-search-wrapper">
-                  <Search className="admin-search-icon"/>
-                  <input 
-                    type="text" 
-                    placeholder="Médecin ou patient…" 
-                    value={apptFilter} 
-                    onChange={e=>setApptFilter(e.target.value)}
-                    className="admin-search-input"
-                    style={{ width: '14rem' }}
-                  />
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                  <input type="text" placeholder="Médecin ou patient…" value={apptFilter} onChange={e=>setApptFilter(e.target.value)}
+                    className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 w-56 bg-white"/>
                 </div>
                 <button onClick={()=>fetchTab('appointments')} className="p-2.5 bg-orange-50 border border-orange-200 text-orange-600 rounded-xl hover:bg-orange-100 transition">
                   <RefreshCw className="w-4 h-4"/>
@@ -639,7 +676,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
                   <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3"/>
                   <p className="text-gray-500 font-medium">Aucun rendez-vous trouvé</p>
-                  <p className="text-xs text-gray-400 mt-1">{appointments.length===0?"Les rendez-vous apparaîtront ici dès qu'un patient prendra rendez-vous":"Aucun résultat pour ce filtre"}</p>
+                  <p className="text-xs text-gray-400 mt-1">{appointments.length===0?'Les rendez-vous apparaîtront ici dès qu'un patient prendra rendez-vous':'Aucun résultat pour ce filtre'}</p>
                 </div>
               ) : (
               <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-x-auto">
@@ -716,14 +753,11 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-sm text-gray-500">{prescriptions.length} au total</p>
                 </div>
               </div>
-              <div className="admin-search-wrapper" style={{ width: '16rem' }}>
-                <Search className="admin-search-icon"/>
-                <input 
-                  type="text" 
-                  placeholder="Médecin ou patient…"
-                  value={prescFilter} 
-                  onChange={e => setPrescFilter(e.target.value)}
-                  className="admin-search-input"
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                <input type="text" placeholder="Médecin ou patient…"
+                  value={prescFilter} onChange={e => setPrescFilter(e.target.value)}
+                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-64 bg-white"
                 />
               </div>
             </div>
@@ -804,14 +838,11 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-sm text-gray-500">{videoCalls.length} au total</p>
                 </div>
               </div>
-              <div className="admin-search-wrapper" style={{ width: '16rem' }}>
-                <Search className="admin-search-icon"/>
-                <input 
-                  type="text" 
-                  placeholder="Médecin ou patient…"
-                  value={videoFilter} 
-                  onChange={e => setVideoFilter(e.target.value)}
-                  className="admin-search-input"
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                <input type="text" placeholder="Médecin ou patient…"
+                  value={videoFilter} onChange={e => setVideoFilter(e.target.value)}
+                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-64 bg-white"
                 />
               </div>
             </div>
@@ -902,14 +933,11 @@ const AdminDashboard: React.FC = () => {
                 {/* Filtre + liste */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
-                  <div className="admin-search-wrapper" style={{ width: '16rem' }}>
-                    <Search className="admin-search-icon"/>
-                    <input 
-                      type="text" 
-                      placeholder="Filtrer par médecin…"
-                      value={payFilter} 
-                      onChange={e => setPayFilter(e.target.value)}
-                      className="admin-search-input"
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                    <input type="text" placeholder="Filtrer par médecin…"
+                      value={payFilter} onChange={e => setPayFilter(e.target.value)}
+                      className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-300 w-64 bg-white"
                     />
                   </div>
                 </div>
@@ -1247,12 +1275,12 @@ const AdminDashboard: React.FC = () => {
                     <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-600 mb-1">Montant *</label>
                       <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900" placeholder="0"/>
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="0"/>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Devise</label>
                       <select value={payForm.currency} onChange={e=>setPayForm(f=>({...f,currency:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900">
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
                         {['XOF','EUR','USD','GHS','XAF'].map(c=><option key={c}>{c}</option>)}
                       </select>
                     </div>
@@ -1261,12 +1289,12 @@ const AdminDashboard: React.FC = () => {
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Période</label>
                       <input type="text" value={payForm.period} onChange={e=>setPayForm(f=>({...f,period:e.target.value}))}
-                        placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"/>
+                        placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Nb consultations</label>
                       <input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"/>
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
                     </div>
                   </div>
 
@@ -1275,10 +1303,10 @@ const AdminDashboard: React.FC = () => {
                     <div className="space-y-2 p-4 bg-green-50 rounded-xl border border-green-200">
                       <p className="text-xs font-bold text-green-700 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
                       <input placeholder="Numéro de téléphone *" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"
+                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
                         type="tel"/>
                       <input placeholder="Référence de la transaction (optionnel)" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"/>
+                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"/>
                     </div>
                   )}
 
@@ -1288,7 +1316,7 @@ const AdminDashboard: React.FC = () => {
                       <p className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
                       {[{pl:'Nom de la banque *',k:'bankName'},{pl:'Numéro de compte *',k:'accountNumber'},{pl:'IBAN (optionnel)',k:'iban'}].map(({pl,k})=>(
                         <input key={k} placeholder={pl} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
-                          className="w-full px-3 py-2.5 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"/>
+                          className="w-full px-3 py-2.5 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
                       ))}
                     </div>
                   )}
@@ -1300,7 +1328,7 @@ const AdminDashboard: React.FC = () => {
                         <Banknote className="w-3.5 h-3.5"/>{payForm.paymentMethod==='cash'?'Paiement espèces':'Paiement par chèque'}
                       </p>
                       <input placeholder="Numéro de référence / reçu" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white text-gray-900"/>
+                        className="w-full px-3 py-2.5 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"/>
                     </div>
                   )}
 
@@ -1309,7 +1337,7 @@ const AdminDashboard: React.FC = () => {
                     <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optionnel)</label>
                     <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
                       placeholder="Observations, justificatifs…"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none bg-white text-gray-900"/>
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"/>
                   </div>
 
                   {/* Boutons */}
@@ -1391,6 +1419,147 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ══════════════ PORTAIL DROPDOWN NOTIFICATIONS ══════════════════════ */}
+      {showNotifDropdown && createPortal(
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 99998 }}
+            onClick={() => setShowNotifDropdown(false)}
+          />
+          <div
+            ref={notifRef}
+            style={{
+              position: 'fixed',
+              top:   notifPos.top,
+              right: notifPos.right,
+              zIndex: 99999,
+              width: '340px',
+              animation: 'adminNotifIn 0.22s cubic-bezier(0.34,1.56,0.64,1) forwards',
+            }}
+            className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+          >
+            <style>{`
+              @keyframes adminNotifIn {
+                from { opacity:0; transform:translateY(-10px) scale(0.97); }
+                to   { opacity:1; transform:translateY(0) scale(1); }
+              }
+            `}</style>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-blue-600"/>
+                <span className="text-gray-900 font-bold text-sm">Notifications</span>
+                {pendingPayCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                    {pendingPayCount}
+                  </span>
+                )}
+              </div>
+              <button onClick={() => setShowNotifDropdown(false)} className="text-gray-400 hover:text-gray-600 transition">
+                <XCircle className="w-4 h-4"/>
+              </button>
+            </div>
+
+            {/* Corps */}
+            <div className="max-h-72 overflow-y-auto">
+              {pendingPayCount === 0 ? (
+                <div className="py-10 text-center">
+                  <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-60"/>
+                  <p className="text-gray-500 text-sm font-medium">Tout est à jour !</p>
+                  <p className="text-gray-400 text-xs mt-1">Aucun paiement en attente</p>
+                </div>
+              ) : (
+                earnings.filter(e => e.stats.amountDue > 0).map(e => (
+                  <div key={e.doctor.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                        <span className="text-white text-xs font-bold">
+                          {e.doctor.firstName[0]}{e.doctor.lastName[0]}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">Dr. {e.doctor.firstName} {e.doctor.lastName}</p>
+                        <p className="text-xs text-gray-500 truncate">{e.doctor.specialty}</p>
+                      </div>
+                      <span className="text-sm font-bold text-red-600 shrink-0">{e.stats.amountDue} XOF</span>
+                    </div>
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={() => { openPayModal(e); setShowNotifDropdown(false); }}
+                        className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1 hover:shadow-md transition-all"
+                      >
+                        <DollarSign className="w-3 h-3"/> Payer maintenant
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            {pendingPayCount > 0 && (
+              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                <button
+                  onClick={() => { setActiveTab('payments'); setShowNotifDropdown(false); }}
+                  className="w-full text-center text-blue-600 hover:text-blue-700 text-xs font-semibold transition-colors"
+                >
+                  Voir tous les paiements →
+                </button>
+              </div>
+            )}
+          </div>
+        </>,
+        document.body
+      )}
+
+      {/* ══════════════ MODAL DÉCONNEXION ════════════════════════════════════ */}
+      {showLogoutModal && createPortal(
+        <div
+          className="flex items-center justify-center"
+          style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-sm mx-4"
+            style={{ animation: 'adminNotifIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards' }}
+          >
+            {/* Icône */}
+            <div className="flex flex-col items-center pt-8 pb-4 px-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-50 to-rose-100 border-2 border-red-200 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+                <LogOut className="w-8 h-8 text-red-500"/>
+              </div>
+              <h2 className="text-xl font-black text-gray-900 mb-2">Déconnexion</h2>
+              <p className="text-gray-500 text-sm text-center leading-relaxed">
+                Êtes-vous sûr de vouloir quitter le panneau d'administration ?
+              </p>
+              <p className="text-gray-400 text-xs text-center mt-1">
+                Vous devrez vous reconnecter pour accéder au dashboard.
+              </p>
+            </div>
+
+            <div className="border-t border-gray-100 mx-6"/>
+
+            {/* Boutons */}
+            <div className="flex gap-3 p-5">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-3 bg-gray-100 border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all text-sm"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => { setShowLogoutModal(false); handleLogout(); }}
+                className="flex-1 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-red-200 transition-all hover:scale-[1.02] text-sm"
+              >
+                <LogOut className="w-4 h-4"/> Se déconnecter
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
     </div>
   );
 };
