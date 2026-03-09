@@ -31,12 +31,14 @@ type AuthAction =
   | { type: 'SET_USER'; payload: User | null }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'LOGOUT' }
+  | { type: 'UPDATE_USER'; payload: Partial<User> } // NOUVEAU
 
 export interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>
   register: (userData: RegisterData) => Promise<void>
   logout: () => void
   updateUser: (user: User) => void
+  updateProfilePicture: (pictureUrl: string, newToken?: string) => void // NOUVEAU
   clearError: () => void
 }
 
@@ -51,6 +53,17 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         ...state,
         user: action.payload,
         isAuthenticated: !!action.payload,
+        isLoading: false,
+        error: null,
+      }
+    case 'UPDATE_USER': // NOUVEAU
+      if (!state.user) return state
+      const updatedUser = { ...state.user, ...action.payload }
+      // Mettre à jour localStorage
+      localStorage.setItem('user', JSON.stringify(updatedUser))
+      return {
+        ...state,
+        user: updatedUser,
         isLoading: false,
         error: null,
       }
@@ -95,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('🔍 Vérification du token...')
         const user = JSON.parse(savedUser)
         
-        // Vérifier le token avec le backend (optionnel mais recommandé)
+        // Vérifier le token avec le backend
         try {
           const currentUser = await authService.getCurrentUser()
           dispatch({ type: 'SET_USER', payload: currentUser })
@@ -121,8 +134,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('🔐 Tentative de connexion pour:', email)
       
-      // Appel API unifié - le backend gère admin et utilisateurs
-      console.log('📡 Appel API login...')
       const result = await authService.login({ email, password })
 
       if (!result || !result.user) {
@@ -252,6 +263,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dispatch({ type: 'SET_USER', payload: user })
   }
 
+  // ✅ NOUVELLE FONCTION SPÉCIFIQUE POUR LA PHOTO DE PROFIL
+  const updateProfilePicture = (pictureUrl: string, newToken?: string) => {
+    console.log('📸 Mise à jour de la photo de profil:', pictureUrl)
+    
+    if (!state.user) {
+      console.warn('⚠️ Aucun utilisateur connecté')
+      return
+    }
+
+    // Mettre à jour le token si fourni
+    if (newToken) {
+      console.log('🔄 Mise à jour du token')
+      localStorage.setItem('token', newToken)
+    }
+
+    // Mettre à jour l'utilisateur
+    const updatedUser = { ...state.user, profilePicture: pictureUrl }
+    
+    // Mettre à jour localStorage
+    localStorage.setItem('user', JSON.stringify(updatedUser))
+    
+    // Mettre à jour le state
+    dispatch({ type: 'UPDATE_USER', payload: { profilePicture: pictureUrl } })
+
+    // Notification optionnelle
+    setTimeout(() => {
+      const event = new CustomEvent('showNotification', {
+        detail: {
+          message: 'Photo de profil mise à jour',
+          type: 'success',
+        },
+      })
+      window.dispatchEvent(event)
+    }, 100)
+
+    console.log('✅ Photo de profil mise à jour avec succès')
+  }
+
   const clearError = () => {
     dispatch({ type: 'SET_ERROR', payload: null })
   }
@@ -262,6 +311,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     updateUser,
+    updateProfilePicture, // NOUVEAU
     clearError,
   }
 
