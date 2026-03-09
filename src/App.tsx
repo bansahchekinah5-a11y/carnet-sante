@@ -15,12 +15,13 @@ import FeaturesPage from './pages/FeaturesPage'
 import PricingPage from './pages/PricingPage'
 import FAQPage from './pages/FAQPage'
 import DocumentationPage from './pages/DocumentationPage'
+import DocPage from './pages/DocPage'             // ✅ NOUVEAU
 
 // Auth
 import Login from './components/Auth/Login'
 import Register from './components/Auth/Register'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'   // ✅ NOUVEAU
-import ResetPasswordPage from './pages/ResetPasswordPage'     // ✅ NOUVEAU
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 // Dashboards & pages protégées
 import DoctorCalendarPage from './pages/DoctorCalendarPage'
@@ -67,21 +68,22 @@ function App() {
             <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Routes>
                 {/* ── Publiques ────────────────────────────────────────────── */}
-                <Route path="/"                  element={<RootRouter />} />
-                <Route path="/login"             element={<Login />} />
-                <Route path="/register"          element={<Register />} />
-                <Route path="/forgot-password"   element={<ForgotPasswordPage />} />  {/* ✅ */}
-                <Route path="/reset-password"    element={<ResetPasswordPage />} />   {/* ✅ */}
+                <Route path="/"                element={<RootRouter />} />
+                <Route path="/login"           element={<Login />} />
+                <Route path="/register"        element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password"  element={<ResetPasswordPage />} />
 
                 {/* ── Pages statiques ──────────────────────────────────────── */}
-                <Route path="/privacy"   element={<PrivacyPage />} />
-                <Route path="/terms"     element={<TermsPage />} />
-                <Route path="/legal"     element={<LegalPage />} />
-                <Route path="/features"  element={<FeaturesPage />} />
-                <Route path="/pricing"   element={<PricingPage />} />
-                <Route path="/faq"       element={<FAQPage />} />
-                <Route path="/docs"      element={<DocumentationPage />} />
-                <Route path="/contact"   element={<ContactPage />} />
+                <Route path="/privacy"      element={<PrivacyPage />} />
+                <Route path="/terms"        element={<TermsPage />} />
+                <Route path="/legal"        element={<LegalPage />} />
+                <Route path="/features"     element={<FeaturesPage />} />
+                <Route path="/pricing"      element={<PricingPage />} />
+                <Route path="/faq"          element={<FAQPage />} />
+                <Route path="/docs"         element={<DocumentationPage />} />
+                <Route path="/docs/:slug"   element={<DocPage />} />     {/* ✅ NOUVEAU */}
+                <Route path="/contact"      element={<ContactPage />} />
 
                 {/* ── Protégées ────────────────────────────────────────────── */}
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
