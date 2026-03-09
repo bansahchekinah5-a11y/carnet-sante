@@ -38,57 +38,63 @@ const HomePage: React.FC = () => {
       title: 'Gestion des rendez-vous',
       description: 'Prenez, modifiez ou annulez vos rendez-vous en ligne facilement',
       color: 'from-blue-500 to-cyan-400',
-      delay: '0ms'
+      delay: '0ms',
+      hash: 'appointments',
     },
     {
       icon: <Building2 className="w-7 h-7" />,
       title: 'Dossier médical numérique',
       description: 'Accédez à votre dossier médical complet en quelques clics',
       color: 'from-purple-500 to-pink-400',
-      delay: '100ms'
+      delay: '100ms',
+      hash: 'medical-record',
     },
     {
       icon: <Bell className="w-7 h-7" />,
       title: 'Rappels intelligents',
       description: 'Recevez des rappels pour vos rendez-vous et traitements',
       color: 'from-emerald-500 to-teal-400',
-      delay: '200ms'
+      delay: '200ms',
+      hash: 'reminders',
     },
     {
       icon: <Stethoscope className="w-7 h-7" />,
       title: 'Réseau de médecins',
       description: 'Trouvez et consultez des professionnels de santé qualifiés',
       color: 'from-orange-500 to-amber-400',
-      delay: '300ms'
+      delay: '300ms',
+      hash: 'teleconsultation',
     },
     {
       icon: <Pill className="w-7 h-7" />,
       title: 'Gestion des traitements',
       description: 'Suivez vos médicaments et traitements au quotidien',
       color: 'from-indigo-500 to-blue-400',
-      delay: '400ms'
+      delay: '400ms',
+      hash: 'availability',
     },
     {
       icon: <LineChart className="w-7 h-7" />,
       title: 'Analyses et suivis',
       description: "Visualisez l'évolution de votre santé dans le temps",
       color: 'from-teal-500 to-cyan-400',
-      delay: '500ms'
-    }
+      delay: '500ms',
+      hash: 'security',
+    },
   ]
 
   const stats = [
     { value: '10k+', label: 'Patients satisfaits', icon: <Users className="w-8 h-8" /> },
     { value: '500+', label: 'Médecins partenaires', icon: <Stethoscope className="w-8 h-8" /> },
     { value: '50k+', label: 'Rendez-vous par mois', icon: <Calendar className="w-8 h-8" /> },
-    { value: '4.9/5', label: 'Note moyenne', icon: <CheckCircle2 className="w-8 h-8" /> }
+    { value: '4.9/5', label: 'Note moyenne', icon: <CheckCircle2 className="w-8 h-8" /> },
   ]
 
   const benefits = [
     'Disponible 24/7',
     'Sécurité maximale',
     'Support réactif',
-    'Gratuit pour commencer'
+    'Gratuit pour commencer',
   ]
 
   return (
@@ -106,38 +112,20 @@ const HomePage: React.FC = () => {
         }
 
         @keyframes slide-up {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(30px); }
+          to   { opacity: 1; transform: translateY(0);    }
         }
 
         @keyframes fade-in {
           from { opacity: 0; }
-          to { opacity: 1; }
+          to   { opacity: 1; }
         }
 
-        .animate-slide-up {
-          animation: slide-up 0.8s ease-out forwards;
-        }
+        .animate-slide-up  { animation: slide-up  0.8s ease-out forwards; }
+        .animate-fade-in   { animation: fade-in   1s   ease-out forwards; }
+        .animate-float     { animation: float     6s   ease-in-out infinite; }
 
-        .animate-fade-in {
-          animation: fade-in 1s ease-out forwards;
-        }
-
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-
-        .feature-card {
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          position: relative;
-        }
-
+        .feature-card { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
         .feature-card::before {
           content: '';
           position: absolute;
@@ -151,20 +139,15 @@ const HomePage: React.FC = () => {
           opacity: 0;
           transition: opacity 0.4s;
         }
-
-        .feature-card:hover::before {
-          opacity: 1;
-        }
-
-        .feature-card:hover {
-          transform: translateY(-8px);
-        }
+        .feature-card:hover::before { opacity: 1; }
+        .feature-card:hover { transform: translateY(-8px); }
       `}</style>
 
-      {/* Navigation avec glassmorphism amélioré */}
+      {/* ── Navigation ── */}
       <nav className="backdrop-blur-xl bg-white/70 sticky top-0 z-50 border-b border-white/50 shadow-lg shadow-slate-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
+
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-3 group cursor-pointer">
               <div className="relative">
@@ -181,20 +164,14 @@ const HomePage: React.FC = () => {
               </div>
             </Link>
 
-            {/* Navigation desktop */}
+            {/* Nav desktop */}
             <div className="hidden md:flex items-center space-x-6">
-              <a href="#features" className="text-slate-700 hover:text-blue-600 transition-colors font-semibold text-sm">
-                Fonctionnalités
-              </a>
-              <a href="#stats" className="text-slate-700 hover:text-blue-600 transition-colors font-semibold text-sm">
-                Statistiques
-              </a>
-              <a href="#contact" className="text-slate-700 hover:text-blue-600 transition-colors font-semibold text-sm">
-                Contact
-              </a>
+              <a href="#features" className="text-slate-700 hover:text-blue-600 transition-colors font-semibold text-sm">Fonctionnalités</a>
+              <a href="#stats"    className="text-slate-700 hover:text-blue-600 transition-colors font-semibold text-sm">Statistiques</a>
+              <a href="#contact"  className="text-slate-700 hover:text-blue-600 transition-colors font-semibold text-sm">Contact</a>
             </div>
 
-            {/* Boutons d'action */}
+            {/* Boutons */}
             <div className="hidden md:flex items-center space-x-3">
               {isAuthenticated ? (
                 <>
@@ -203,30 +180,22 @@ const HomePage: React.FC = () => {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
-                    <span className="text-sm font-bold text-slate-700">
-                      {user?.firstName}
-                    </span>
+                    <span className="text-sm font-bold text-slate-700">{user?.firstName}</span>
                   </div>
-                  <Link
-                    to="/dashboard"
-                    className="group inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/50 transition-all hover:scale-105"
-                  >
+                  <Link to="/dashboard"
+                    className="group inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/50 transition-all hover:scale-105">
                     <span>Dashboard</span>
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </>
               ) : (
                 <>
-                  <Link
-                    to="/login"
-                    className="text-slate-700 hover:text-blue-600 px-5 py-2 rounded-xl text-sm font-bold transition-all hover:bg-white/70"
-                  >
+                  <Link to="/login"
+                    className="text-slate-700 hover:text-blue-600 px-5 py-2 rounded-xl text-sm font-bold transition-all hover:bg-white/70">
                     Connexion
                   </Link>
-                  <Link
-                    to="/register"
-                    className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/50 transition-all hover:scale-105"
-                  >
+                  <Link to="/register"
+                    className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/50 transition-all hover:scale-105">
                     Inscription
                   </Link>
                 </>
@@ -234,15 +203,9 @@ const HomePage: React.FC = () => {
             </div>
 
             {/* Menu mobile */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl hover:bg-white/50 transition-colors"
-            >
-              {mobileMenuOpen ? (
-                <X className="w-6 h-6 text-slate-700" />
-              ) : (
-                <Menu className="w-6 h-6 text-slate-700" />
-              )}
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-xl hover:bg-white/50 transition-colors">
+              {mobileMenuOpen ? <X className="w-6 h-6 text-slate-700" /> : <Menu className="w-6 h-6 text-slate-700" />}
             </button>
           </div>
 
@@ -250,23 +213,13 @@ const HomePage: React.FC = () => {
           {mobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-white/50">
               <div className="flex flex-col space-y-3">
-                <a href="#features" className="text-slate-700 hover:text-blue-600 transition-colors font-semibold px-4 py-2 rounded-xl hover:bg-white/50">
-                  Fonctionnalités
-                </a>
-                <a href="#stats" className="text-slate-700 hover:text-blue-600 transition-colors font-semibold px-4 py-2 rounded-xl hover:bg-white/50">
-                  Statistiques
-                </a>
-                <a href="#contact" className="text-slate-700 hover:text-blue-600 transition-colors font-semibold px-4 py-2 rounded-xl hover:bg-white/50">
-                  Contact
-                </a>
+                <a href="#features" className="text-slate-700 hover:text-blue-600 transition-colors font-semibold px-4 py-2 rounded-xl hover:bg-white/50">Fonctionnalités</a>
+                <a href="#stats"    className="text-slate-700 hover:text-blue-600 transition-colors font-semibold px-4 py-2 rounded-xl hover:bg-white/50">Statistiques</a>
+                <a href="#contact"  className="text-slate-700 hover:text-blue-600 transition-colors font-semibold px-4 py-2 rounded-xl hover:bg-white/50">Contact</a>
                 {!isAuthenticated && (
                   <>
-                    <Link to="/login" className="text-slate-700 font-bold px-4 py-2 rounded-xl hover:bg-white/50 transition-all">
-                      Connexion
-                    </Link>
-                    <Link to="/register" className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold px-4 py-2 rounded-xl text-center">
-                      Inscription
-                    </Link>
+                    <Link to="/login"    className="text-slate-700 font-bold px-4 py-2 rounded-xl hover:bg-white/50 transition-all">Connexion</Link>
+                    <Link to="/register" className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold px-4 py-2 rounded-xl text-center">Inscription</Link>
                   </>
                 )}
               </div>
@@ -275,43 +228,32 @@ const HomePage: React.FC = () => {
         </div>
       </nav>
 
-      {/* Hero Section avec animations améliorées */}
+      {/* ── Hero ── */}
       <div className="relative overflow-hidden">
-        {/* Blobs animés */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-20 left-10 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full blur-3xl animate-float" 
-               style={{ animationDelay: '0s' }}></div>
-          <div className="absolute top-40 right-10 w-80 h-80 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-float" 
-               style={{ animationDelay: '2s' }}></div>
-          <div className="absolute bottom-20 left-1/3 w-72 h-72 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 rounded-full blur-3xl animate-float" 
-               style={{ animationDelay: '4s' }}></div>
+          <div className="absolute top-20 left-10 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '0s' }}></div>
+          <div className="absolute top-40 right-10 w-80 h-80 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
+          <div className="absolute bottom-20 left-1/3 w-72 h-72 bg-gradient-to-br from-emerald-400/20 to-teal-400/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }}></div>
         </div>
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32 relative">
           <div className="text-center max-w-5xl mx-auto">
+
             {/* Badge */}
-            <div 
-              className={`inline-flex items-center gap-2 backdrop-blur-xl bg-white/80 px-5 py-2.5 rounded-full text-sm font-bold mb-8 border border-blue-200/50 shadow-lg ${isVisible ? 'animate-slide-up' : 'opacity-0'}`}
-              style={{ animationDelay: '0ms' }}
-            >
+            <div className={`inline-flex items-center gap-2 backdrop-blur-xl bg-white/80 px-5 py-2.5 rounded-full text-sm font-bold mb-8 border border-blue-200/50 shadow-lg ${isVisible ? 'animate-slide-up' : 'opacity-0'}`}
+                 style={{ animationDelay: '0ms' }}>
               <Sparkles className="w-4 h-4 text-blue-600" />
               <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                 Plateforme de santé #1 en Afrique
               </span>
             </div>
 
-            {/* Titre principal */}
+            {/* Titre */}
             <h1 className={`text-5xl md:text-7xl lg:text-8xl font-black mb-8 leading-tight ${isVisible ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: '100ms' }}>
-              <span className="block mb-3">
-                <span className="text-slate-900">
-                  Votre santé,
-                </span>
-              </span>
+              <span className="block mb-3"><span className="text-slate-900">Votre santé,</span></span>
               <span className="block">
-                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  simplifiée
-                </span>
+                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">simplifiée</span>
               </span>
             </h1>
 
@@ -322,30 +264,24 @@ const HomePage: React.FC = () => {
               suivez votre parcours médical en toute simplicité.
             </p>
 
-            {/* Boutons CTA */}
+            {/* CTA */}
             <div className={`flex flex-col sm:flex-row gap-4 justify-center mb-16 ${isVisible ? 'animate-slide-up' : 'opacity-0'}`}
                  style={{ animationDelay: '300ms' }}>
               {!isAuthenticated ? (
                 <>
-                  <Link
-                    to="/register"
-                    className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white rounded-2xl text-lg font-black shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all hover:scale-105"
-                  >
+                  <Link to="/register"
+                    className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white rounded-2xl text-lg font-black shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all hover:scale-105">
                     <span>Commencer gratuitement</span>
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Link>
-                  <Link
-                    to="/login"
-                    className="group inline-flex items-center justify-center gap-2 px-8 py-4 backdrop-blur-xl bg-white/80 text-slate-700 rounded-2xl text-lg font-black border-2 border-white hover:border-blue-400 hover:text-blue-600 transition-all hover:shadow-xl"
-                  >
+                  <Link to="/login"
+                    className="group inline-flex items-center justify-center gap-2 px-8 py-4 backdrop-blur-xl bg-white/80 text-slate-700 rounded-2xl text-lg font-black border-2 border-white hover:border-blue-400 hover:text-blue-600 transition-all hover:shadow-xl">
                     <span>Se connecter</span>
                   </Link>
                 </>
               ) : (
-                <Link
-                  to="/dashboard"
-                  className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white rounded-2xl text-lg font-black shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all hover:scale-105"
-                >
+                <Link to="/dashboard"
+                  className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white rounded-2xl text-lg font-black shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transition-all hover:scale-105">
                   <span>Accéder au dashboard</span>
                   <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
@@ -363,14 +299,12 @@ const HomePage: React.FC = () => {
               ))}
             </div>
 
-            {/* Statistiques */}
+            {/* Stats */}
             <div id="stats" className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
               {stats.map((stat, index) => (
-                <div 
-                  key={index} 
+                <div key={index}
                   className={`backdrop-blur-xl bg-white/80 p-6 rounded-2xl border border-white shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 group ${isVisible ? 'animate-slide-up' : 'opacity-0'}`}
-                  style={{ animationDelay: `${500 + index * 100}ms` }}
-                >
+                  style={{ animationDelay: `${500 + index * 100}ms` }}>
                   <div className="text-blue-600 mb-3 flex justify-center opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 transform duration-300">
                     {stat.icon}
                   </div>
@@ -385,7 +319,7 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Features Section */}
+      {/* ── Features ── */}
       <div id="features" className="py-24 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -404,18 +338,15 @@ const HomePage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <div
-                key={index}
+              <div key={index}
                 className="feature-card group backdrop-blur-xl bg-white/80 rounded-3xl p-8 border border-white shadow-xl hover:shadow-2xl"
-                style={{ animationDelay: feature.delay }}
-              >
+                style={{ animationDelay: feature.delay }}>
+
                 {/* Icône */}
                 <div className="relative mb-6">
                   <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} rounded-2xl blur-xl opacity-0 group-hover:opacity-50 transition-all duration-500`}></div>
                   <div className={`relative bg-gradient-to-br ${feature.color} rounded-2xl p-4 inline-flex group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-                    <div className="text-white">
-                      {feature.icon}
-                    </div>
+                    <div className="text-white">{feature.icon}</div>
                   </div>
                 </div>
 
@@ -426,24 +357,26 @@ const HomePage: React.FC = () => {
                   {feature.description}
                 </p>
 
-                {/* Lien */}
-                <div className="flex items-center text-sm font-black text-slate-400 group-hover:text-blue-600 transition-colors">
+                {/* ← Lien cliquable vers /features#<hash> */}
+                <Link
+                  to={`/features#${feature.hash}`}
+                  className="flex items-center text-sm font-black text-slate-400 group-hover:text-blue-600 transition-colors hover:gap-2"
+                >
                   <span>En savoir plus</span>
                   <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-2 transition-transform" />
-                </div>
+                </Link>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Section CTA */}
+      {/* ── CTA Banner ── */}
       <div className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600">
           <div className="absolute top-10 left-10 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-float"></div>
           <div className="absolute bottom-10 right-10 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '3s' }}></div>
         </div>
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <div className="mb-6">
             <Activity className="w-16 h-16 text-white/90 mx-auto mb-4 animate-float" strokeWidth={1.5} />
@@ -454,20 +387,19 @@ const HomePage: React.FC = () => {
           <p className="text-xl md:text-2xl text-white/90 mb-12 max-w-2xl mx-auto font-bold leading-relaxed">
             Rejoignez des milliers de patients et médecins qui utilisent déjà notre plateforme
           </p>
-          <Link
-            to="/register"
-            className="group inline-flex items-center gap-3 px-10 py-5 bg-white text-blue-600 rounded-2xl text-lg font-black shadow-2xl hover:shadow-white/50 hover:scale-105 transition-all"
-          >
+          <Link to="/register"
+            className="group inline-flex items-center gap-3 px-10 py-5 bg-white text-blue-600 rounded-2xl text-lg font-black shadow-2xl hover:shadow-white/50 hover:scale-105 transition-all">
             <span>Créer un compte gratuitement</span>
             <ChevronRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
           </Link>
         </div>
       </div>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <footer id="contact" className="bg-slate-900 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+
             {/* Logo */}
             <div className="col-span-1">
               <div className="flex items-center space-x-3 mb-6">
@@ -496,10 +428,10 @@ const HomePage: React.FC = () => {
             <div>
               <h4 className="text-lg font-black mb-4">Produit</h4>
               <ul className="space-y-3">
-                <li><a href="/features" className="text-slate-400 hover:text-white transition font-semibold text-sm">Fonctionnalités</a></li>
-                <li><a href="/pricing" className="text-slate-400 hover:text-white transition font-semibold text-sm">Tarifs</a></li>
-                <li><a href="/faq" className="text-slate-400 hover:text-white transition font-semibold text-sm">FAQ</a></li>
-                <li><a href="/docs" className="text-slate-400 hover:text-white transition font-semibold text-sm">Documentation</a></li>
+                <li><Link to="/features" className="text-slate-400 hover:text-white transition font-semibold text-sm">Fonctionnalités</Link></li>
+                <li><a href="/pricing"   className="text-slate-400 hover:text-white transition font-semibold text-sm">Tarifs</a></li>
+                <li><a href="/faq"       className="text-slate-400 hover:text-white transition font-semibold text-sm">FAQ</a></li>
+                <li><Link to="/docs"     className="text-slate-400 hover:text-white transition font-semibold text-sm">Documentation</Link></li>
               </ul>
             </div>
 
@@ -508,8 +440,8 @@ const HomePage: React.FC = () => {
               <h4 className="text-lg font-black mb-4">Légal</h4>
               <ul className="space-y-3">
                 <li><a href="/privacy" className="text-slate-400 hover:text-white transition font-semibold text-sm">Confidentialité</a></li>
-                <li><a href="/terms" className="text-slate-400 hover:text-white transition font-semibold text-sm">Conditions</a></li>
-                <li><a href="/legal" className="text-slate-400 hover:text-white transition font-semibold text-sm">Mentions légales</a></li>
+                <li><a href="/terms"   className="text-slate-400 hover:text-white transition font-semibold text-sm">Conditions</a></li>
+                <li><a href="/legal"   className="text-slate-400 hover:text-white transition font-semibold text-sm">Mentions légales</a></li>
               </ul>
             </div>
 
