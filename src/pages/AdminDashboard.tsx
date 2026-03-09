@@ -594,15 +594,24 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
-                <select value={apptStatus} onChange={e=>setApptStatus(e.target.value)}
-                  className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+                <select 
+                  value={apptStatus} 
+                  onChange={e=>setApptStatus(e.target.value)}
+                  className="admin-select w-auto"
+                >
                   <option value="">Tous les statuts</option>
                   {Object.entries(APPT_STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
                 </select>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                  <input type="text" placeholder="Médecin ou patient…" value={apptFilter} onChange={e=>setApptFilter(e.target.value)}
-                    className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 w-56 bg-white"/>
+                <div className="admin-search-wrapper">
+                  <Search className="admin-search-icon"/>
+                  <input 
+                    type="text" 
+                    placeholder="Médecin ou patient…" 
+                    value={apptFilter} 
+                    onChange={e=>setApptFilter(e.target.value)}
+                    className="admin-search-input"
+                    style={{ width: '14rem' }}
+                  />
                 </div>
                 <button onClick={()=>fetchTab('appointments')} className="p-2.5 bg-orange-50 border border-orange-200 text-orange-600 rounded-xl hover:bg-orange-100 transition">
                   <RefreshCw className="w-4 h-4"/>
@@ -707,11 +716,14 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-sm text-gray-500">{prescriptions.length} au total</p>
                 </div>
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                <input type="text" placeholder="Médecin ou patient…"
-                  value={prescFilter} onChange={e => setPrescFilter(e.target.value)}
-                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-64 bg-white"
+              <div className="admin-search-wrapper" style={{ width: '16rem' }}>
+                <Search className="admin-search-icon"/>
+                <input 
+                  type="text" 
+                  placeholder="Médecin ou patient…"
+                  value={prescFilter} 
+                  onChange={e => setPrescFilter(e.target.value)}
+                  className="admin-search-input"
                 />
               </div>
             </div>
@@ -792,11 +804,14 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-sm text-gray-500">{videoCalls.length} au total</p>
                 </div>
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                <input type="text" placeholder="Médecin ou patient…"
-                  value={videoFilter} onChange={e => setVideoFilter(e.target.value)}
-                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-64 bg-white"
+              <div className="admin-search-wrapper" style={{ width: '16rem' }}>
+                <Search className="admin-search-icon"/>
+                <input 
+                  type="text" 
+                  placeholder="Médecin ou patient…"
+                  value={videoFilter} 
+                  onChange={e => setVideoFilter(e.target.value)}
+                  className="admin-search-input"
                 />
               </div>
             </div>
@@ -887,11 +902,14 @@ const AdminDashboard: React.FC = () => {
                 {/* Filtre + liste */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                    <input type="text" placeholder="Filtrer par médecin…"
-                      value={payFilter} onChange={e => setPayFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-300 w-64 bg-white"
+                  <div className="admin-search-wrapper" style={{ width: '16rem' }}>
+                    <Search className="admin-search-icon"/>
+                    <input 
+                      type="text" 
+                      placeholder="Filtrer par médecin…"
+                      value={payFilter} 
+                      onChange={e => setPayFilter(e.target.value)}
+                      className="admin-search-input"
                     />
                   </div>
                 </div>
@@ -1229,12 +1247,12 @@ const AdminDashboard: React.FC = () => {
                     <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-600 mb-1">Montant *</label>
                       <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="0"/>
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900" placeholder="0"/>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Devise</label>
                       <select value={payForm.currency} onChange={e=>setPayForm(f=>({...f,currency:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900">
                         {['XOF','EUR','USD','GHS','XAF'].map(c=><option key={c}>{c}</option>)}
                       </select>
                     </div>
@@ -1243,12 +1261,12 @@ const AdminDashboard: React.FC = () => {
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Période</label>
                       <input type="text" value={payForm.period} onChange={e=>setPayForm(f=>({...f,period:e.target.value}))}
-                        placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
+                        placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"/>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Nb consultations</label>
                       <input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"/>
                     </div>
                   </div>
 
@@ -1257,10 +1275,10 @@ const AdminDashboard: React.FC = () => {
                     <div className="space-y-2 p-4 bg-green-50 rounded-xl border border-green-200">
                       <p className="text-xs font-bold text-green-700 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
                       <input placeholder="Numéro de téléphone *" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"
                         type="tel"/>
                       <input placeholder="Référence de la transaction (optionnel)" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"/>
+                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-gray-900"/>
                     </div>
                   )}
 
@@ -1270,7 +1288,7 @@ const AdminDashboard: React.FC = () => {
                       <p className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
                       {[{pl:'Nom de la banque *',k:'bankName'},{pl:'Numéro de compte *',k:'accountNumber'},{pl:'IBAN (optionnel)',k:'iban'}].map(({pl,k})=>(
                         <input key={k} placeholder={pl} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
-                          className="w-full px-3 py-2.5 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
+                          className="w-full px-3 py-2.5 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"/>
                       ))}
                     </div>
                   )}
@@ -1282,7 +1300,7 @@ const AdminDashboard: React.FC = () => {
                         <Banknote className="w-3.5 h-3.5"/>{payForm.paymentMethod==='cash'?'Paiement espèces':'Paiement par chèque'}
                       </p>
                       <input placeholder="Numéro de référence / reçu" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"/>
+                        className="w-full px-3 py-2.5 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white text-gray-900"/>
                     </div>
                   )}
 
@@ -1291,7 +1309,7 @@ const AdminDashboard: React.FC = () => {
                     <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optionnel)</label>
                     <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
                       placeholder="Observations, justificatifs…"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"/>
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none bg-white text-gray-900"/>
                   </div>
 
                   {/* Boutons */}
