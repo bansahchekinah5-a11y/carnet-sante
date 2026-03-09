@@ -18,7 +18,7 @@ interface Appointment {
   doctorId: string;
   appointmentDate: string;
   duration: number;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+  status: 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled' | 'no_show' | 'missed';
   type: 'in_person' | 'teleconsultation' | 'home_visit';
   reason: string;
   patient: {
@@ -68,6 +68,13 @@ const DoctorDashboard: React.FC = () => {
   const [error, setError]                             = useState<string | null>(null);
   const [filter, setFilter]                           = useState<'today' | 'pending' | 'upcoming'>('pending');
   const [stats, setStats]                             = useState({ totalAppointments: 0, todayAppointments: 0, totalPatients: 0 });
+
+  // ── 🕐 Horloge — recalcule les statuts toutes les 30s ─────────────────────
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // ── 🔔 Notification dropdown ────────────────────────────────────────────────
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -305,6 +312,43 @@ const DoctorDashboard: React.FC = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   // HELPERS
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // ── 🔄 Calcul dynamique du statut affiché (anticipation côté client) ────────
+  const getComputedStatus = (
+    dbStatus: string,
+    appointmentDate: string,
+    duration: number = 30
+  ): string => {
+    if (['cancelled', 'no_show', 'missed', 'completed'].includes(dbStatus)) return dbStatus;
+    const start = new Date(appointmentDate).getTime();
+    const end   = start + duration * 60 * 1000;
+    const t     = now.getTime();
+    if (dbStatus === 'confirmed' || dbStatus === 'ongoing') {
+      if (t >= end)   return 'completed';
+      if (t >= start) return 'ongoing';
+    }
+    return dbStatus;
+  };
+
+  const getStatusLabel = (status: string): string => ({
+    pending:   '⏳ En attente',
+    confirmed: '✅ Confirmé',
+    ongoing:   '🔵 En cours',
+    completed: '☑️ Terminé',
+    cancelled: '❌ Annulé',
+    no_show:   '👻 Non honoré',
+    missed:    '⚠️ Manqué',
+  }[status] ?? status);
+
+  const getStatusBadgeClass = (status: string): string => ({
+    pending:   'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30',
+    confirmed: 'bg-green-500/20  text-green-300  border border-green-500/30',
+    ongoing:   'bg-blue-500/20   text-blue-200   border border-blue-400/40 animate-pulse',
+    completed: 'bg-gray-500/20   text-gray-300   border border-gray-500/30',
+    cancelled: 'bg-red-500/20    text-red-300    border border-red-500/30',
+    no_show:   'bg-orange-500/20 text-orange-300 border border-orange-500/30',
+    missed:    'bg-red-700/20    text-red-400    border border-red-700/30',
+  }[status] ?? 'bg-gray-500/20 text-gray-300 border border-gray-500/30');
 
   const filteredAppointments = appointments.filter(apt => {
     const now = new Date();
@@ -726,14 +770,21 @@ const DoctorDashboard: React.FC = () => {
                 )
                 .map(apt => {
                   const { date, time, day } = formatDateTime(apt.appointmentDate);
+                  const computed = getComputedStatus(apt.status, apt.appointmentDate, apt.duration);
                   return (
                     <div key={apt.id} className={`p-4 bg-white/5 border rounded-xl hover:bg-white/10 transition-all ${
-                      apt.status === 'pending'
-                        ? 'border-yellow-500/30 hover:border-yellow-500/50'
-                        : apt.status === 'confirmed'
-                        ? 'border-green-500/30 hover:border-green-500/50'
-                        : 'border-white/10 hover:border-white/30'
+                      computed === 'pending'   ? 'border-yellow-500/30 hover:border-yellow-500/50'
+                      : computed === 'ongoing'  ? 'border-blue-400/50 shadow-lg shadow-blue-500/10'
+                      : computed === 'confirmed'? 'border-green-500/30 hover:border-green-500/50'
+                      : 'border-white/10 hover:border-white/30'
                     }`}>
+                      {/* Bandeau "En cours" */}
+                      {computed === 'ongoing' && (
+                        <div className="flex items-center gap-2 mb-3 px-3 py-1.5 bg-blue-500/20 border border-blue-400/30 rounded-lg">
+                          <span className="w-2 h-2 bg-blue-400 rounded-full animate-ping shrink-0" />
+                          <span className="text-blue-200 text-xs font-bold tracking-wider uppercase">Consultation en cours</span>
+                        </div>
+                      )}
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-3">
@@ -767,16 +818,8 @@ const DoctorDashboard: React.FC = () => {
                             <p className="text-xs text-gray-400 mb-1">Motif</p>
                             <p className="text-white text-sm truncate">{apt.reason}</p>
                           </div>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                            apt.status === 'pending'
-                              ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-                              : apt.status === 'confirmed'
-                              ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                              : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                          }`}>
-                            {apt.status === 'pending' ? '⏳ En attente' :
-                             apt.status === 'confirmed' ? '✅ Confirmé' :
-                             apt.status}
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${getStatusBadgeClass(computed)}`}>
+                            {getStatusLabel(computed)}
                           </span>
                         </div>
                         <div className="flex flex-col gap-2 shrink-0">
@@ -796,7 +839,7 @@ const DoctorDashboard: React.FC = () => {
                               </button>
                             </>
                           )}
-                          {apt.status === 'confirmed' && (
+                          {(apt.status === 'confirmed' || computed === 'ongoing') && (
                             <>
                               <button
                                 onClick={() => openPrescription(apt.patient, apt.id)}
