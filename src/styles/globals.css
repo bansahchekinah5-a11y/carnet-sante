@@ -55,7 +55,7 @@
     @apply bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent;
   }
 
-  /* ─── Formulaires ──────────────────────────────────────────────────────── */
+  /* ─── Formulaires futuristes (pour pages publiques) ───────────────────── */
   .futuristic-input {
     @apply w-full px-4 py-3
            bg-white/5 border border-white/10 rounded-xl
@@ -72,6 +72,62 @@
            focus:border-blue-500 focus:outline-none
            focus:ring-2 focus:ring-blue-500/50
            transition-all duration-300;
+  }
+
+  /* ─── INPUTS POUR L'ADMIN DASHBOARD (FORCE LE TEXTE NOIR) ─────────────── */
+  .admin-input {
+    @apply px-4 py-2.5 border border-gray-200 rounded-xl text-sm 
+           focus:outline-none focus:ring-2 bg-white;
+    color: #111827 !important;
+  }
+
+  .admin-input::placeholder {
+    color: #9ca3af !important;
+    opacity: 1;
+  }
+
+  .admin-input:focus {
+    --tw-ring-color: #3b82f6;
+    border-color: transparent;
+  }
+
+  .admin-select {
+    @apply px-3 py-2.5 border border-gray-200 rounded-xl text-sm 
+           focus:outline-none focus:ring-2 bg-white appearance-none;
+    color: #111827 !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+  }
+
+  .admin-select:focus {
+    --tw-ring-color: #3b82f6;
+    border-color: transparent;
+  }
+
+  .admin-select option {
+    color: #111827;
+    background-color: #ffffff;
+  }
+
+  .admin-search-wrapper {
+    @apply relative;
+  }
+
+  .admin-search-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400;
+  }
+
+  .admin-search-input {
+    @apply pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm 
+           focus:outline-none focus:ring-2 bg-white w-full;
+    color: #111827 !important;
+  }
+
+  .admin-search-input::placeholder {
+    color: #9ca3af !important;
   }
 
   /* ─── Navigation ───────────────────────────────────────────────────────── */
@@ -94,6 +150,15 @@
 
   .animate-slide-in {
     animation: slideIn 0.6s ease-out forwards;
+  }
+
+  /* Masquer la scrollbar tout en gardant la fonctionnalité */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -144,7 +209,7 @@
 }
 
 /* ==========================================================================
-   EFFET HOLOGRAPHIQUE (optionnel – à appliquer via classe .holographic)
+   EFFET HOLOGRAPHIQUE
    ========================================================================== */
 .holographic {
   background: linear-gradient(
@@ -176,11 +241,10 @@
 .holographic:hover::before {
   left: 100%;
 }
-/* ==========================================================================
-   STYLES CORRIGÉS POUR LES CARTES DE RENDEZ-VOUS
-   ========================================================================== */
 
-/* Style de base */
+/* ==========================================================================
+   STYLES POUR LES CARTES DE RENDEZ-VOUS
+   ========================================================================== */
 .rdv-card {
   @apply bg-white/5 backdrop-blur-md
          rounded-xl border border-white/10
@@ -188,14 +252,12 @@
          cursor-pointer;
 }
 
-/* Survol élégant - pas de blanc agressif */
 .rdv-card:hover {
   @apply bg-white/10 border-blue-500/40;
   box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
   transform: translateY(-2px);
 }
 
-/* Variante selon le statut */
 .rdv-card.cancelled:hover {
   @apply border-red-500/40;
   box-shadow: 0 8px 20px rgba(239, 68, 68, 0.2);
