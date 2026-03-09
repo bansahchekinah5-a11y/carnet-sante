@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/userService';
 import { appointmentService } from '../../services/appointmentService';
 import { medicalFileService } from '../../services/medicalFileService';
+import { calendarService } from '../../services/calendarService';
 import {
   Calendar, Users, Clock, X, Check, Bell, ChevronRight,
   LogOut, Plus, Video, FileText, Pill, Search, Send,
@@ -53,20 +54,41 @@ interface PrescriptionLine {
   instructions: string;
 }
 
+interface Calendar {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  daysOfWeek: string[];
+  slots: string[];
+  isActive: boolean;
+  createdAt: string;
+}
+
 const FREQUENCIES = ['1 fois/jour', '2 fois/jour', '3 fois/jour', 'Matin et soir', 'Au besoin', 'Avant les repas', 'Après les repas'];
 const DURATIONS   = ['3 jours', '5 jours', '7 jours', '10 jours', '14 jours', '1 mois', '3 mois', 'Continu'];
 
 const DoctorDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { showNotification } = useNotification();
   const doctorUser = user as DoctorUser;
 
   const [appointments, setAppointments]               = useState<Appointment[]>([]);
+  const [calendars, setCalendars]                     = useState<Calendar[]>([]);
   const [loading, setLoading]                         = useState(true);
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  const [calendarsLoading, setCalendarsLoading]       = useState(false);
   const [error, setError]                             = useState<string | null>(null);
   const [filter, setFilter]                           = useState<'today' | 'pending' | 'upcoming'>('pending');
   const [stats, setStats]                             = useState({ totalAppointments: 0, todayAppointments: 0, totalPatients: 0 });
+
+  // ── Recherche ───────────────────────────────────────────────────────────────
+  const [searchPatient, setSearchPatient]                 = useState('');
+  const [videoSearchPatient, setVideoSearchPatient]       = useState('');
+  const [calendarSearch, setCalendarSearch]               = useState('');
 
   // ── Prescription state ──────────────────────────────────────────────────────
   const [showPrescription, setShowPrescription]           = useState(false);
@@ -78,7 +100,6 @@ const DoctorDashboard: React.FC = () => {
   const [prescriptionNote, setPrescriptionNote]           = useState('');
   const [prescriptionSent, setPrescriptionSent]           = useState(false);
   const [prescriptionLoading, setPrescriptionLoading]     = useState(false);
-  const [searchPatient, setSearchPatient]                 = useState('');
 
   // ── Video call state ────────────────────────────────────────────────────────
   const [showVideoModal, setShowVideoModal]             = useState(false);
@@ -86,7 +107,10 @@ const DoctorDashboard: React.FC = () => {
   const [videoAppointmentId, setVideoAppointmentId]     = useState<string | null>(null);
   const [videoLink, setVideoLink]                       = useState('');
   const [videoLoading, setVideoLoading]                 = useState(false);
-  const [videoSearchPatient, setVideoSearchPatient]     = useState('');
+
+  // ── Notifications state ─────────────────────────────────────────────────────
+  const [showNotifications, setShowNotifications]       = useState(false);
+  const [notifications, setNotifications]               = useState<any[]>([]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // DATA FETCHING
@@ -112,6 +136,18 @@ const DoctorDashboard: React.FC = () => {
     finally { setAppointmentsLoading(false); }
   };
 
+  const fetchCalendars = async () => {
+    try {
+      setCalendarsLoading(true);
+      const data = await calendarService.getCalendars();
+      setCalendars(data || []);
+    } catch (error) {
+      console.error('Erreur chargement calendriers:', error);
+    } finally {
+      setCalendarsLoading(false);
+    }
+  };
+
   const fetchStats = async () => {
     try {
       const statsResponse = await userService.getDashboardStats();
@@ -119,11 +155,28 @@ const DoctorDashboard: React.FC = () => {
     } catch { /* silencieux */ }
   };
 
+  const fetchNotifications = async () => {
+    try {
+      // Simuler des notifications (à remplacer par un vrai service)
+      const mockNotifications = [
+        { id: '1', message: 'Nouveau rendez-vous en attente', time: 'Il y a 5 min', read: false },
+        { id: '2', message: 'Paiement reçu de 50€', time: 'Il y a 1h', read: false },
+        { id: '3', message: 'Rappel: Consultation avec Martin Dupont à 14h', time: 'Il y a 2h', read: true },
+      ];
+      setNotifications(mockNotifications);
+    } catch (error) {
+      console.error('Erreur chargement notifications:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true); setError(null);
-        await fetchStats(); await fetchAppointments();
+        await fetchStats(); 
+        await fetchAppointments();
+        await fetchCalendars();
+        await fetchNotifications();
       } catch (error: any) {
         setError(error.message || 'Impossible de charger les données.');
         setStats({ totalAppointments: 24, todayAppointments: 5, totalPatients: 12 });
@@ -155,8 +208,18 @@ const DoctorDashboard: React.FC = () => {
     } catch { showNotification('❌ Erreur lors de l\'annulation', 'error'); }
   };
 
+  const toggleCalendarStatus = async (calendarId: string, currentStatus: boolean) => {
+    try {
+      await calendarService.toggleCalendarStatus(calendarId, !currentStatus);
+      showNotification(`✅ Calendrier ${!currentStatus ? 'activé' : 'désactivé'}`, 'success');
+      fetchCalendars();
+    } catch (error) {
+      showNotification('❌ Erreur lors du changement de statut', 'error');
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
-  // ✅ PRESCRIPTION — APPEL API RÉEL
+  // PRESCRIPTION
   // ─────────────────────────────────────────────────────────────────────────────
 
   const openPrescription = (patient: Appointment['patient'], appointmentId?: string) => {
@@ -227,7 +290,7 @@ const DoctorDashboard: React.FC = () => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // ✅ APPEL VIDÉO — APPEL API RÉEL
+  // VIDEO CALL
   // ─────────────────────────────────────────────────────────────────────────────
 
   const openVideoModal = (patient: Appointment['patient'], appointmentId?: string) => {
@@ -270,6 +333,19 @@ const DoctorDashboard: React.FC = () => {
     }
   };
 
+  const markNotificationAsRead = (id: string) => {
+    setNotifications(prev => 
+      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    );
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(prev => 
+      prev.map(n => ({ ...n, read: true }))
+    );
+    showNotification('Toutes les notifications ont été marquées comme lues', 'success');
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
   // HELPERS
   // ─────────────────────────────────────────────────────────────────────────────
@@ -301,6 +377,12 @@ const DoctorDashboard: React.FC = () => {
     `${p.firstName} ${p.lastName}`.toLowerCase().includes(videoSearchPatient.toLowerCase())
   );
 
+  const filteredCalendars = calendars.filter(cal =>
+    !calendarSearch || 
+    cal.name?.toLowerCase().includes(calendarSearch.toLowerCase()) ||
+    cal.startDate?.includes(calendarSearch)
+  );
+
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return {
@@ -310,12 +392,19 @@ const DoctorDashboard: React.FC = () => {
     };
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
   const statCards: StatCard[] = [
     { title: "Rendez-vous aujourd'hui", value: stats.todayAppointments, icon: Calendar, color: 'from-blue-500 to-blue-600' },
     { title: 'Total rendez-vous',       value: stats.totalAppointments,  icon: Calendar, color: 'from-green-500 to-green-600' },
     { title: 'Patients totaux',          value: stats.totalPatients,      icon: Users,    color: 'from-purple-500 to-purple-600' },
     { title: 'En attente',               value: appointments.filter(a => a.status === 'pending').length, icon: Clock, color: 'from-yellow-500 to-yellow-600' },
   ];
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -343,16 +432,67 @@ const DoctorDashboard: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            {/* Notifications - Icône cliquable avec dropdown */}
             <div className="relative">
-              <button className="p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-3 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300 relative"
+              >
                 <Bell className="w-5 h-5 text-white" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg pulse-glow">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
-              {appointments.filter(a => a.status === 'pending').length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg pulse-glow">
-                  {appointments.filter(a => a.status === 'pending').length}
-                </span>
+
+              {/* Dropdown notifications */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-gray-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+                  <div className="p-3 border-b border-white/10 flex justify-between items-center">
+                    <h4 className="text-white font-semibold">Notifications</h4>
+                    {unreadCount > 0 && (
+                      <button 
+                        onClick={markAllAsRead}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Tout marquer comme lu
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500">
+                        Aucune notification
+                      </div>
+                    ) : (
+                      notifications.map(notif => (
+                        <div 
+                          key={notif.id} 
+                          className={`p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition ${
+                            !notif.read ? 'bg-blue-500/5' : ''
+                          }`}
+                          onClick={() => markNotificationAsRead(notif.id)}
+                        >
+                          <p className="text-white text-sm">{notif.message}</p>
+                          <p className="text-gray-500 text-xs mt-1">{notif.time}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-2 border-t border-white/10">
+                    <Link 
+                      to="/notifications" 
+                      className="block text-center text-sm text-blue-400 hover:text-blue-300 py-1"
+                      onClick={() => setShowNotifications(false)}
+                    >
+                      Voir toutes les notifications
+                    </Link>
+                  </div>
+                </div>
               )}
             </div>
+
             <button onClick={handleLogout} className="futuristic-btn-secondary flex items-center gap-2 hover:scale-105">
               <LogOut className="w-5 h-5" />
               <span className="font-semibold">Déconnexion</span>
@@ -502,7 +642,7 @@ const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* RENDEZ-VOUS AVEC LA MÊME DISPOSITION QUE LES ORDONNANCES */}
+      {/* RENDEZ-VOUS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 futuristic-card p-6">
           <div className="flex items-center gap-3 mb-5">
@@ -746,17 +886,163 @@ const DoctorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* GESTION CALENDRIER */}
+      {/* GESTION DES CALENDRIERS - MÊME DISPOSITION QUE LES AUTRES SECTIONS */}
       <div className="futuristic-card p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-xl font-bold text-white mb-2">Gestion des disponibilités</h3>
-            <p className="text-gray-400 text-sm">Créez et gérez vos calendriers de disponibilités</p>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2.5 bg-purple-500/20 rounded-xl">
+            <Calendar className="w-6 h-6 text-purple-400" />
           </div>
-          <Link to="/doctor/calendar" className="futuristic-btn flex items-center gap-2">
-            <Plus className="w-5 h-5" /> Créer un nouveau calendrier
+          <div>
+            <h3 className="text-xl font-bold text-white">Gestion des calendriers</h3>
+            <p className="text-gray-400 text-sm">Créez et gérez vos disponibilités</p>
+          </div>
+        </div>
+
+        {/* Barre de recherche et bouton d'ajout */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-5">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher un calendrier..."
+              value={calendarSearch}
+              onChange={e => setCalendarSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 text-sm"
+            />
+          </div>
+          <Link to="/doctor/calendar/new" className="px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg hover:from-purple-600 hover:to-purple-700 transition-all hover:scale-105 whitespace-nowrap">
+            <Plus className="w-4 h-4" /> Nouveau calendrier
           </Link>
         </div>
+
+        {/* Liste des calendriers */}
+        {calendarsLoading ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto"></div>
+            <p className="text-gray-400 mt-4">Chargement des calendriers...</p>
+          </div>
+        ) : filteredCalendars.length === 0 ? (
+          <div className="text-center py-12">
+            <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400">Aucun calendrier trouvé</p>
+            <p className="text-gray-500 text-sm mt-1">Créez votre premier calendrier de disponibilités</p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+            {filteredCalendars.map(cal => (
+              <div key={cal.id} className={`p-4 bg-white/5 border rounded-xl hover:bg-white/10 hover:border-purple-500/30 transition-all ${
+                cal.isActive ? 'border-white/10' : 'border-white/5 opacity-75'
+              }`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-10 h-10 bg-gradient-to-br rounded-lg flex items-center justify-center shrink-0 ${
+                        cal.isActive 
+                          ? 'from-purple-500 to-pink-600' 
+                          : 'from-gray-500 to-gray-600'
+                      }`}>
+                        <Calendar className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white font-medium text-sm truncate">
+                          {cal.name || `Disponibilités`}
+                        </p>
+                        <p className="text-gray-500 text-xs truncate">
+                          {cal.slots?.length || 0} créneaux disponibles
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className="bg-white/5 rounded-lg p-2">
+                        <p className="text-xs text-gray-400 mb-1">Période</p>
+                        <p className="text-white text-sm font-semibold">{formatDate(cal.startDate)}</p>
+                        <p className="text-gray-300 text-xs">au {formatDate(cal.endDate)}</p>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-2">
+                        <p className="text-xs text-gray-400 mb-1">Créneaux</p>
+                        <p className="text-white text-sm font-semibold">{cal.startTime} - {cal.endTime}</p>
+                        <p className="text-gray-300 text-xs">{cal.daysOfWeek?.join(', ')}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {cal.slots?.slice(0, 5).map((slot: string, idx: number) => (
+                        <span key={idx} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">
+                          {slot}
+                        </span>
+                      ))}
+                      {cal.slots?.length > 5 && (
+                        <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 rounded text-xs">
+                          +{cal.slots.length - 5}
+                        </span>
+                      )}
+                    </div>
+
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                      cal.isActive 
+                        ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                        : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                    }`}>
+                      {cal.isActive && <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>}
+                      {cal.isActive ? 'Actif' : 'Inactif'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <Link 
+                      to={`/doctor/calendar/edit/${cal.id}`} 
+                      className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-semibold hover:bg-blue-500/30 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <FileText className="w-3 h-3" /> Modifier
+                    </Link>
+                    <button 
+                      onClick={() => toggleCalendarStatus(cal.id, cal.isActive)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                        cal.isActive 
+                          ? 'bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30'
+                          : 'bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30'
+                      }`}
+                    >
+                      {cal.isActive ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                      {cal.isActive ? 'Désactiver' : 'Activer'}
+                    </button>
+                    <Link 
+                      to={`/doctor/calendar/${cal.id}`} 
+                      className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg text-xs font-semibold hover:from-purple-600 hover:to-pink-700 transition-all flex items-center gap-1.5 shadow-lg whitespace-nowrap"
+                    >
+                      Détails <ChevronRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pied de page avec statistiques */}
+        {calendars.length > 0 && (
+          <div className="mt-5 pt-4 border-t border-white/10">
+            <div className="flex justify-between items-center text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400">Total calendriers:</span>
+                <span className="text-white font-bold">{calendars.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400">Actifs:</span>
+                <span className="text-green-400 font-bold">
+                  {calendars.filter(c => c.isActive).length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400">Créneaux totaux:</span>
+                <span className="text-purple-400 font-bold">
+                  {calendars.reduce((acc, c) => acc + (c.slots?.length || 0), 0)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ══════════════════ MODAL ORDONNANCE ══════════════════ */}
