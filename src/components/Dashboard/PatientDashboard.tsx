@@ -652,7 +652,7 @@ const PatientDashboard: React.FC = () => {
                         {doctor.available ? `${doctor.availableSlots.length} créneaux` : '-'}
                       </td>
                       <td className="py-4 px-4 text-white/80 font-semibold">
-                        {doctor.consultationPrice}€
+                        {doctor.consultationPrice} XOF
                       </td>
                       <td className="py-4 px-4">
                         <button
@@ -915,7 +915,7 @@ const PatientDashboard: React.FC = () => {
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
                         <p className="text-lg font-semibold text-gray-900">Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}</p>
                         <p className="text-gray-600 mt-2">{selectedDoctor.specialty}</p>
-                        <p className="text-gray-600 mt-2">Tarif: {selectedDoctor.consultationPrice || 50}€</p>
+                        <p className="text-gray-600 mt-2">Tarif: {selectedDoctor.consultationPrice || 50} XOF</p>
                       </div>
                       <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1035,7 +1035,7 @@ const PatientDashboard: React.FC = () => {
                           <div className="border-t border-gray-200 mt-3 pt-3">
                             <div className="flex justify-between items-center">
                               <span className="font-semibold">Total à payer:</span>
-                              <span className="text-2xl font-bold text-blue-600">{selectedDoctor.consultationPrice || 50} €</span>
+                              <span className="text-2xl font-bold text-blue-600">{selectedDoctor.consultationPrice || 50} XOF</span>
                             </div>
                           </div>
                         </div>
@@ -1090,7 +1090,7 @@ const PatientDashboard: React.FC = () => {
                           className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 font-semibold flex items-center gap-2"
                         >
                           <CreditCard size={18} />
-                          Payer {selectedDoctor.consultationPrice || 50} €
+                          Payer {selectedDoctor.consultationPrice || 50} XOF
                         </button>
                       </div>
                     </div>
