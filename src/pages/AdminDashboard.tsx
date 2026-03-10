@@ -749,16 +749,16 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <select value={apptStatus} onChange={e=>setApptStatus(e.target.value)}
-                  className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+                  className="px-3 py-2.5 border-2 border-orange-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white shadow-md text-gray-700">
                   <option value="">Tous les statuts</option>
                   {Object.entries(APPT_STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
                 </select>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                  <input type="text" placeholder="Médecin ou patient…" value={apptFilter} onChange={e=>setApptFilter(e.target.value)}
-                    className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 w-56 bg-white"/>
+                <div className="relative shadow-md rounded-xl">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400"/>
+                  <input type="text" placeholder="Rechercher médecin ou patient…" value={apptFilter} onChange={e=>setApptFilter(e.target.value)}
+                    className="pl-9 pr-4 py-2.5 border-2 border-orange-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 w-64 bg-white text-gray-700 font-medium"/>
                 </div>
-                <button onClick={()=>fetchTab('appointments')} className="p-2.5 bg-orange-50 border border-orange-200 text-orange-600 rounded-xl hover:bg-orange-100 transition">
+                <button onClick={()=>fetchTab('appointments')} className="p-2.5 bg-orange-50 border-2 border-orange-200 text-orange-600 rounded-xl hover:bg-orange-100 transition shadow-md">
                   <RefreshCw className="w-4 h-4"/>
                 </button>
               </div>
@@ -870,11 +870,11 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-sm text-gray-500">{prescriptions.length} au total</p>
                 </div>
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                <input type="text" placeholder="Médecin ou patient…"
+              <div className="relative shadow-md rounded-xl">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400"/>
+                <input type="text" placeholder="Rechercher médecin ou patient…"
                   value={prescFilter} onChange={e => setPrescFilter(e.target.value)}
-                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-64 bg-white"
+                  className="pl-9 pr-4 py-2.5 border-2 border-emerald-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-64 bg-white text-gray-700 font-medium shadow-md"
                 />
               </div>
             </div>
@@ -955,11 +955,11 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-sm text-gray-500">{videoCalls.length} au total</p>
                 </div>
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                <input type="text" placeholder="Médecin ou patient…"
+              <div className="relative shadow-md rounded-xl">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400"/>
+                <input type="text" placeholder="Rechercher médecin ou patient…"
                   value={videoFilter} onChange={e => setVideoFilter(e.target.value)}
-                  className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-64 bg-white"
+                  className="pl-9 pr-4 py-2.5 border-2 border-blue-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-64 bg-white text-gray-700 font-medium shadow-md"
                 />
               </div>
             </div>
@@ -1050,11 +1050,11 @@ const AdminDashboard: React.FC = () => {
                 {/* Filtre + liste */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                  <div className="relative shadow-md rounded-xl">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-400"/>
                     <input type="text" placeholder="Filtrer par médecin…"
                       value={payFilter} onChange={e => setPayFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-300 w-64 bg-white"
+                      className="pl-9 pr-4 py-2.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 w-64 bg-white text-gray-700 font-medium"
                     />
                   </div>
                 </div>
