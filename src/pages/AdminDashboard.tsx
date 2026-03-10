@@ -590,42 +590,50 @@ const AdminDashboard: React.FC = () => {
                     </h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto">
                       {(() => {
-                        // RDV récents triés par date (les plus récents d'abord)
                         const recentApts = [...(appointments || [])]
                           .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())
                           .slice(0, 8);
                         if (recentApts.length === 0) return (
                           <div className="text-center py-10"><Activity className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucune activité récente</p></div>
                         );
+                        // Chaque statut a sa propre couleur d'icône + badge distinct
+                        const STATUS_META: Record<string, { bg: string; icon: string; label: string; pill: string; dot: string }> = {
+                          completed: { bg:'bg-blue-100',   icon:'text-blue-600',   label:'Terminé',     pill:'bg-blue-100 text-blue-700 border-blue-300',     dot:'bg-blue-500'   },
+                          ongoing:   { bg:'bg-cyan-100',   icon:'text-cyan-600',   label:'En cours',    pill:'bg-cyan-100 text-cyan-700 border-cyan-300 animate-pulse',     dot:'bg-cyan-500'   },
+                          confirmed: { bg:'bg-green-100',  icon:'text-green-600',  label:'Confirmé',    pill:'bg-green-100 text-green-700 border-green-300',   dot:'bg-green-500'  },
+                          pending:   { bg:'bg-yellow-100', icon:'text-yellow-600', label:'En attente',  pill:'bg-yellow-100 text-yellow-700 border-yellow-300', dot:'bg-yellow-500' },
+                          cancelled: { bg:'bg-red-100',    icon:'text-red-500',    label:'Annulé',      pill:'bg-red-100 text-red-600 border-red-300',         dot:'bg-red-500'    },
+                          missed:    { bg:'bg-orange-100', icon:'text-orange-600', label:'Manqué',      pill:'bg-orange-100 text-orange-700 border-orange-300', dot:'bg-orange-500' },
+                          no_show:   { bg:'bg-gray-100',   icon:'text-gray-500',   label:'Non honoré',  pill:'bg-gray-100 text-gray-600 border-gray-300',      dot:'bg-gray-400'   },
+                        };
                         return recentApts.map(a => {
                           const computed = getComputedStatus(a.status, a.appointmentDate, a.duration);
-                          const statusColors: Record<string, string> = {
-                            completed: 'bg-blue-500',  ongoing: 'bg-cyan-500 animate-pulse',
-                            confirmed: 'bg-green-500',  pending: 'bg-yellow-500',
-                            cancelled: 'bg-red-500',    missed: 'bg-orange-500', no_show: 'bg-gray-500',
-                          };
-                          const statusLabels: Record<string, string> = {
-                            completed: 'Terminé', ongoing: 'En cours', confirmed: 'Confirmé',
-                            pending: 'En attente', cancelled: 'Annulé', missed: 'Manqué', no_show: 'Non honoré',
-                          };
+                          const meta = STATUS_META[computed] || STATUS_META.pending;
                           const d = new Date(a.appointmentDate);
-                          const dateStr = d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+                          const dateStr = d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short' });
                           const timeStr = d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
                           return (
-                            <div key={a.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-blue-200 transition">
-                              <div className={`w-8 h-8 ${statusColors[computed]||'bg-gray-400'} rounded-full flex items-center justify-center shrink-0`}>
-                                <Calendar className="w-4 h-4 text-white"/>
+                            <div key={a.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                              {/* Icône colorée */}
+                              <div className={`w-9 h-9 ${meta.bg} rounded-xl flex items-center justify-center shrink-0 shadow-sm`}>
+                                <span className={`text-base ${meta.icon}`}>
+                                  {computed==='completed'?'✓':computed==='ongoing'?'▶':computed==='confirmed'?'📅':computed==='pending'?'⏳':computed==='cancelled'?'✕':computed==='missed'?'⚠':'👻'}
+                                </span>
                               </div>
+                              {/* Infos */}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {a.patient?.firstName} {a.patient?.lastName} → Dr. {a.doctor?.lastName}
+                                <p className="text-sm font-semibold text-gray-900 truncate">
+                                  {a.patient?.firstName} {a.patient?.lastName}
                                 </p>
-                                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                  <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{dateStr} {timeStr}</span>
-                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLE[computed]||STATUS_STYLE.pending}`}>
-                                    {statusLabels[computed] || computed}
-                                  </span>
-                                </div>
+                                <p className="text-xs text-gray-500 truncate">Dr. {a.doctor?.lastName} • {a.motif || a.reason || '—'}</p>
+                              </div>
+                              {/* Date + badge statut */}
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                <span className="text-xs text-gray-400 font-medium">{dateStr} {timeStr}</span>
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${meta.pill}`}>
+                                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${meta.dot} mr-1`}/>
+                                  {meta.label}
+                                </span>
                               </div>
                             </div>
                           );
@@ -1390,71 +1398,87 @@ const AdminDashboard: React.FC = () => {
                   {/* Montant + devise + période */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Montant *</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">💰 Montant *</label>
                       <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="0"/>
+                        className="w-full px-3 py-2.5 border-2 border-green-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 bg-green-50 text-gray-800 shadow-sm" placeholder="0"/>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Devise</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">Devise</label>
                       <select value={payForm.currency} onChange={e=>setPayForm(f=>({...f,currency:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white">
+                        className="w-full px-3 py-2.5 border-2 border-green-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 bg-green-50 text-gray-800 shadow-sm">
                         {['XOF','EUR','USD','GHS','XAF'].map(c=><option key={c}>{c}</option>)}
                       </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Période</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">📅 Période</label>
                       <input type="text" value={payForm.period} onChange={e=>setPayForm(f=>({...f,period:e.target.value}))}
-                        placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
+                        placeholder="ex: Mars 2026" className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Nb consultations</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">🩺 Nb consultations</label>
                       <input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"/>
+                        className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
                     </div>
                   </div>
 
                   {/* Champs spécifiques mobile money */}
                   {payForm.paymentMethod === 'mobile_money' && (
-                    <div className="space-y-2 p-4 bg-green-50 rounded-xl border border-green-200">
-                      <p className="text-xs font-bold text-green-700 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
-                      <input placeholder="Numéro de téléphone *" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
-                        type="tel"/>
-                      <input placeholder="Référence de la transaction (optionnel)" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"/>
+                    <div className="space-y-2.5 p-4 bg-green-50 rounded-xl border-2 border-green-300 shadow-sm">
+                      <p className="text-xs font-bold text-green-800 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
+                      <div>
+                        <label className="block text-xs font-semibold text-green-700 mb-1">📱 Numéro de téléphone *</label>
+                        <input placeholder="+228 XX XX XX XX" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
+                          className="w-full px-3 py-2.5 border-2 border-green-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"
+                          type="tel"/>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-green-700 mb-1">🔖 Référence transaction (optionnel)</label>
+                        <input placeholder="Ex: TXN-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                          className="w-full px-3 py-2.5 border-2 border-green-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
+                      </div>
                     </div>
                   )}
 
                   {/* Champs spécifiques virement */}
                   {payForm.paymentMethod === 'bank_transfer' && (
-                    <div className="space-y-2 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
-                      {[{pl:'Nom de la banque *',k:'bankName'},{pl:'Numéro de compte *',k:'accountNumber'},{pl:'IBAN (optionnel)',k:'iban'}].map(({pl,k})=>(
-                        <input key={k} placeholder={pl} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
-                          className="w-full px-3 py-2.5 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"/>
+                    <div className="space-y-2.5 p-4 bg-blue-50 rounded-xl border-2 border-blue-300 shadow-sm">
+                      <p className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
+                      {[
+                        {pl:'🏦 Nom de la banque *', k:'bankName'},
+                        {pl:'🔢 Numéro de compte *', k:'accountNumber'},
+                        {pl:'🌍 IBAN (optionnel)',    k:'iban'}
+                      ].map(({pl,k})=>(
+                        <div key={k}>
+                          <label className="block text-xs font-semibold text-blue-700 mb-1">{pl}</label>
+                          <input placeholder={pl.replace(/^[^ ]+ /,'')} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
+                            className="w-full px-3 py-2.5 border-2 border-blue-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 shadow-sm"/>
+                        </div>
                       ))}
                     </div>
                   )}
 
                   {/* Espèces / Chèque */}
                   {(payForm.paymentMethod==='cash'||payForm.paymentMethod==='check') && (
-                    <div className="space-y-2 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-                      <p className="text-xs font-bold text-yellow-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <div className="space-y-2.5 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-300 shadow-sm">
+                      <p className="text-xs font-bold text-yellow-800 uppercase tracking-wider flex items-center gap-1.5">
                         <Banknote className="w-3.5 h-3.5"/>{payForm.paymentMethod==='cash'?'Paiement espèces':'Paiement par chèque'}
                       </p>
-                      <input placeholder="Numéro de référence / reçu" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                        className="w-full px-3 py-2.5 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white"/>
+                      <div>
+                        <label className="block text-xs font-semibold text-yellow-700 mb-1">🔖 Numéro de référence / reçu</label>
+                        <input placeholder="Ex: REC-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                          className="w-full px-3 py-2.5 border-2 border-yellow-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-gray-800 shadow-sm"/>
+                      </div>
                     </div>
                   )}
 
                   {/* Notes */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optionnel)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">📝 Notes (optionnel)</label>
                     <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
                       placeholder="Observations, justificatifs…"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"/>
+                      className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm resize-none"/>
                   </div>
 
                   {/* Boutons */}
