@@ -263,7 +263,7 @@ const PatientDashboard: React.FC = () => {
           specialty: d.specialty || 'Non spécifié',
           available: d.isActive !== false,
           availableSlots: d.availableSlots || ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
-          consultationPrice: d.consultationPrice || 45000
+          consultationPrice: 45000
         }));
 
         setDoctors(fetchedDoctors);
@@ -433,7 +433,7 @@ const PatientDashboard: React.FC = () => {
   };
 
   const formatPrice = (price: number | undefined): string => {
-    return price ? new Intl.NumberFormat('fr-FR').format(price) : '45 000';
+    return '45 000';
   };
 
   if (!user) {
