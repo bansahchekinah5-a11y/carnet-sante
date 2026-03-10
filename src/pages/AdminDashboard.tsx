@@ -1310,139 +1310,178 @@ const AdminDashboard: React.FC = () => {
         )}
       </div>
 
-      {showPayModal && selectedEarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md text-white font-bold text-lg">
-                  {selectedEarning.doctor.firstName[0]}{selectedEarning.doctor.lastName[0]}
+     {/* ══════════════ MODAL PAIEMENT — 2 ÉTAPES ════════════════════════════ */}
+{showPayModal && selectedEarning && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md text-white font-bold text-lg">
+            {selectedEarning.doctor.firstName[0]}{selectedEarning.doctor.lastName[0]}
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">
+              Payer Dr. {selectedEarning.doctor.firstName} {selectedEarning.doctor.lastName}
+            </h2>
+            <p className="text-xs text-gray-500">{selectedEarning.doctor.specialty}</p>
+          </div>
+        </div>
+        <button onClick={() => setShowPayModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition">
+          <X className="w-5 h-5 text-gray-500"/>
+        </button>
+      </div>
+
+      {/* ── Stepper ── */}
+      <div className="flex items-center gap-2 px-6 pt-4 pb-2">
+        {[{n:1,l:'Méthode de paiement'},{n:2,l:'Détails & confirmation'}].map(({n,l})=>(
+          <React.Fragment key={n}>
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${payStep>=n?'bg-green-500 text-white shadow-md':'bg-gray-200 text-gray-500'}`}>{n}</div>
+              <span className={`text-xs font-medium transition-colors ${payStep>=n?'text-green-600':'text-gray-400'}`}>{l}</span>
+            </div>
+            {n<2 && <div className={`flex-1 h-0.5 transition-all ${payStep>=2?'bg-green-400':'bg-gray-200'}`}/>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="p-6 max-h-[65vh] overflow-y-auto">
+
+        {/* ══════ ÉTAPE 1 : Méthode de paiement ══════ */}
+        {payStep === 1 && (
+          <div className="space-y-5">
+            {/* Résumé médecin avec calculs corrigés */}
+            {(() => {
+              const consultations = selectedEarning.stats.unpaidConsultations || 0;
+              const montantTotal = consultations * 45000; // 45 000 XOF par consultation
+              const partMedecin = montantTotal * 0.9; // 90% pour le médecin
+              
+              return (
+                <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 leading-tight mb-1">Consultations impayées</p>
+                    <p className="text-xl font-bold text-gray-900">{consultations}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 leading-tight mb-1">Montant dû</p>
+                    <p className="text-xl font-bold text-red-600">{montantTotal.toLocaleString('fr-FR')} XOF</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 leading-tight mb-1">Part médecin</p>
+                    <p className="text-xl font-bold text-blue-600">{partMedecin.toLocaleString('fr-FR')} XOF</p>
+                    <p className="text-xs text-gray-400">(90%)</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">
-                    Payer Dr. {selectedEarning.doctor.firstName} {selectedEarning.doctor.lastName}
-                  </h2>
-                  <p className="text-xs text-gray-500">{selectedEarning.doctor.specialty}</p>
+              );
+            })()}
+
+            {/* Choix méthode principale */}
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Comment souhaitez-vous payer ?</p>
+              <div className="grid grid-cols-2 gap-3">
+                {PAYMENT_METHODS.map(m => {
+                  const Icon = m.icon;
+                  const active = payForm.paymentMethod === m.value;
+                  return (
+                    <button key={m.value} type="button"
+                      onClick={() => { setPayForm(f=>({...f,paymentMethod:m.value})); setSelectedOperator(''); }}
+                      className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all font-medium ${active?`border-green-500 ${m.bg} shadow-md`:`border-gray-200 hover:border-gray-300 hover:bg-gray-50`}`}>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${active?'bg-green-500 shadow-md':'bg-gray-100'}`}>
+                        <Icon className={`w-5 h-5 ${active?'text-white':m.color}`}/>
+                      </div>
+                      <div className="text-left">
+                        <p className={`text-sm font-semibold ${active?'text-green-700':'text-gray-700'}`}>{m.label}</p>
+                      </div>
+                      {active && <CheckCircle className="w-5 h-5 text-green-500 ml-auto"/>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Si mobile money → grille opérateurs avec logos exacts */}
+            {payForm.paymentMethod === 'mobile_money' && (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-green-500"/>
+                  Choisissez l'opérateur
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {MOBILE_OPERATORS.map(op => {
+                    const active = selectedOperator === op.id;
+                    return (
+                      <button key={op.id} type="button"
+                        onClick={() => setSelectedOperator(op.id)}
+                        className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all font-medium ${active?`border-green-500 bg-green-50 shadow-md`:'border-gray-200 hover:border-gray-300 bg-white'}`}>
+                        <div className={`w-10 h-10 ${op.color} rounded-xl flex items-center justify-center text-xl shadow-sm shrink-0 text-white font-bold`}>
+                          {op.emoji}
+                        </div>
+                        <div className="text-left min-w-0">
+                          <p className={`text-sm font-semibold truncate ${active?'text-green-700':'text-gray-800'}`}>{op.label}</p>
+                          <p className="text-xs text-gray-400 truncate">{op.country}</p>
+                        </div>
+                        {active && <CheckCircle className="w-4 h-4 text-green-500 ml-auto shrink-0"/>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <button onClick={() => setShowPayModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition">
-                <X className="w-5 h-5 text-gray-500"/>
-              </button>
-            </div>
+            )}
 
-            <div className="flex items-center gap-2 px-6 pt-4 pb-2">
-              {[{n:1,l:'Méthode de paiement'},{n:2,l:'Détails & confirmation'}].map(({n,l})=>(
-                <React.Fragment key={n}>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${payStep>=n?'bg-green-500 text-white shadow-md':'bg-gray-200 text-gray-500'}`}>{n}</div>
-                    <span className={`text-xs font-medium transition-colors ${payStep>=n?'text-green-600':'text-gray-400'}`}>{l}</span>
-                  </div>
-                  {n<2 && <div className={`flex-1 h-0.5 transition-all ${payStep>=2?'bg-green-400':'bg-gray-200'}`}/>}
-                </React.Fragment>
-              ))}
-            </div>
-
-            <div className="p-6 max-h-[65vh] overflow-y-auto">
-              {payStep === 1 && (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    {[
-                      {l:'Consultations impayées', v:selectedEarning.stats.unpaidConsultations, c:'text-gray-900'},
-                      {l:'Montant dû',             v:`${selectedEarning.stats.amountDue} XOF`,  c:'text-red-600'},
-                      {l:'Part médecin',           v:'90%',                                      c:'text-blue-600'},
-                    ].map(({l,v,c})=>(
-                      <div key={l} className="text-center"><p className="text-xs text-gray-500 leading-tight mb-1">{l}</p><p className={`text-xl font-bold ${c}`}>{v}</p></div>
-                    ))}
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700 mb-3">Comment souhaitez-vous payer ?</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {PAYMENT_METHODS.map(m => {
-                        const Icon = m.icon;
-                        const active = payForm.paymentMethod === m.value;
-                        return (
-                          <button key={m.value} type="button"
-                            onClick={() => { setPayForm(f=>({...f,paymentMethod:m.value})); setSelectedOperator(''); }}
-                            className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all font-medium ${active?`border-green-500 ${m.bg} shadow-md`:`border-gray-200 hover:border-gray-300 hover:bg-gray-50`}`}>
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${active?'bg-green-500 shadow-md':'bg-gray-100'}`}>
-                              <Icon className={`w-5 h-5 ${active?'text-white':m.color}`}/>
-                            </div>
-                            <div className="text-left">
-                              <p className={`text-sm font-semibold ${active?'text-green-700':'text-gray-700'}`}>{m.label}</p>
-                            </div>
-                            {active && <CheckCircle className="w-5 h-5 text-green-500 ml-auto"/>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {payForm.paymentMethod === 'mobile_money' && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                        <Smartphone className="w-4 h-4 text-green-500"/>
-                        Choisissez l'opérateur
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {MOBILE_OPERATORS.map(op => {
-                          const active = selectedOperator === op.id;
-                          return (
-                            <button key={op.id} type="button"
-                              onClick={() => setSelectedOperator(op.id)}
-                              className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all font-medium ${active?`border-green-500 bg-green-50 shadow-md`:'border-gray-200 hover:border-gray-300 bg-white'}`}>
-                              <div className={`w-10 h-10 ${op.color} rounded-xl flex items-center justify-center text-xl shadow-sm shrink-0`}>
-                                {op.emoji}
-                              </div>
-                              <div className="text-left min-w-0">
-                                <p className={`text-sm font-semibold truncate ${active?'text-green-700':'text-gray-800'}`}>{op.label}</p>
-                                <p className="text-xs text-gray-400 truncate">{op.country}</p>
-                              </div>
-                              {active && <CheckCircle className="w-4 h-4 text-green-500 ml-auto shrink-0"/>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <button type="button"
-                    onClick={() => setPayStep(2)}
-                    disabled={payForm.paymentMethod==='mobile_money' && !selectedOperator}
-                    className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    Continuer →
-                    {payForm.paymentMethod==='mobile_money' && !selectedOperator && (
-                      <span className="text-xs text-green-200 ml-1">(choisir un opérateur)</span>
-                    )}
-                  </button>
-                </div>
+            {/* Bouton Suivant */}
+            <button type="button"
+              onClick={() => setPayStep(2)}
+              disabled={payForm.paymentMethod==='mobile_money' && !selectedOperator}
+              className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              Continuer →
+              {payForm.paymentMethod==='mobile_money' && !selectedOperator && (
+                <span className="text-xs text-green-200 ml-1">(choisir un opérateur)</span>
               )}
+            </button>
+          </div>
+        )}
 
-              {payStep === 2 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
-                    {(() => {
-                      const method = PAYMENT_METHODS.find(m=>m.value===payForm.paymentMethod);
-                      const op = MOBILE_OPERATORS.find(o=>o.id===selectedOperator);
-                      const Icon = method?.icon || Smartphone;
-                      return <>
-                        <div className={`w-10 h-10 ${op?op.color:'bg-green-500'} rounded-xl flex items-center justify-center shadow-sm shrink-0`}>
-                          {op ? <span className="text-xl">{op.emoji}</span> : <Icon className="w-5 h-5 text-white"/>}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{op?.label || method?.label}</p>
-                          <p className="text-xs text-gray-500">{op?.country || 'Méthode sélectionnée'}</p>
-                        </div>
-                        <button type="button" onClick={()=>setPayStep(1)} className="ml-auto text-xs text-green-600 hover:underline font-medium">Changer</button>
-                      </>;
-                    })()}
+        {/* ══════ ÉTAPE 2 : Détails & confirmation ══════ */}
+        {payStep === 2 && (
+          <div className="space-y-4">
+            {/* Récap méthode choisie */}
+            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+              {(() => {
+                const method = PAYMENT_METHODS.find(m=>m.value===payForm.paymentMethod);
+                const op = MOBILE_OPERATORS.find(o=>o.id===selectedOperator);
+                const Icon = method?.icon || Smartphone;
+                return <>
+                  <div className={`w-10 h-10 ${op?op.color:'bg-green-500'} rounded-xl flex items-center justify-center shadow-sm shrink-0 text-white font-bold`}>
+                    {op ? <span className="text-xl">{op.emoji}</span> : <Icon className="w-5 h-5 text-white"/>}
                   </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{op?.label || method?.label}</p>
+                    <p className="text-xs text-gray-500">{op?.country || 'Méthode sélectionnée'}</p>
+                  </div>
+                  <button type="button" onClick={()=>setPayStep(1)} className="ml-auto text-xs text-green-600 hover:underline font-medium">Changer</button>
+                </>;
+              })()}
+            </div>
 
+            {/* Montant pré-rempli avec le bon calcul */}
+            {(() => {
+              const consultations = selectedEarning.stats.unpaidConsultations || 0;
+              const montantTotal = consultations * 45000;
+              const partMedecin = montantTotal * 0.9;
+              
+              return (
+                <>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">💰 Montant *</label>
-                      <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border-2 border-green-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 bg-green-50 text-gray-800 shadow-sm" placeholder="0"/>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">💰 Montant à payer *</label>
+                      <input 
+                        type="number" 
+                        value={partMedecin} 
+                        onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
+                        className="w-full px-3 py-2.5 border-2 border-green-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 bg-green-50 text-gray-800 shadow-sm" 
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{consultations} consultation(s) à 45 000 XOF → {montantTotal.toLocaleString('fr-FR')} XOF (90% = {partMedecin.toLocaleString('fr-FR')} XOF)</p>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1.5">Devise</label>
@@ -1460,84 +1499,92 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1.5">🩺 Nb consultations</label>
-                      <input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
+                      <input type="number" value={consultations} readOnly
+                        className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 shadow-sm cursor-not-allowed"/>
                     </div>
                   </div>
+                </>
+              );
+            })()}
 
-                  {payForm.paymentMethod === 'mobile_money' && (
-                    <div className="space-y-2.5 p-4 bg-green-50 rounded-xl border-2 border-green-300 shadow-sm">
-                      <p className="text-xs font-bold text-green-800 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
-                      <div>
-                        <label className="block text-xs font-semibold text-green-700 mb-1">📱 Numéro de téléphone *</label>
-                        <input placeholder="+228 XX XX XX XX" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
-                          className="w-full px-3 py-2.5 border-2 border-green-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"
-                          type="tel"/>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-green-700 mb-1">🔖 Référence transaction (optionnel)</label>
-                        <input placeholder="Ex: TXN-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                          className="w-full px-3 py-2.5 border-2 border-green-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
-                      </div>
-                    </div>
-                  )}
-
-                  {payForm.paymentMethod === 'bank_transfer' && (
-                    <div className="space-y-2.5 p-4 bg-blue-50 rounded-xl border-2 border-blue-300 shadow-sm">
-                      <p className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
-                      {[
-                        {pl:'🏦 Nom de la banque *', k:'bankName'},
-                        {pl:'🔢 Numéro de compte *', k:'accountNumber'},
-                        {pl:'🌍 IBAN (optionnel)',    k:'iban'}
-                      ].map(({pl,k})=>(
-                        <div key={k}>
-                          <label className="block text-xs font-semibold text-blue-700 mb-1">{pl}</label>
-                          <input placeholder={pl.replace(/^[^ ]+ /,'')} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
-                            className="w-full px-3 py-2.5 border-2 border-blue-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 shadow-sm"/>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {(payForm.paymentMethod==='cash'||payForm.paymentMethod==='check') && (
-                    <div className="space-y-2.5 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-300 shadow-sm">
-                      <p className="text-xs font-bold text-yellow-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <Banknote className="w-3.5 h-3.5"/>{payForm.paymentMethod==='cash'?'Paiement espèces':'Paiement par chèque'}
-                      </p>
-                      <div>
-                        <label className="block text-xs font-semibold text-yellow-700 mb-1">🔖 Numéro de référence / reçu</label>
-                        <input placeholder="Ex: REC-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                          className="w-full px-3 py-2.5 border-2 border-yellow-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-gray-800 shadow-sm"/>
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">📝 Notes (optionnel)</label>
-                    <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
-                      placeholder="Observations, justificatifs…"
-                      className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm resize-none"/>
-                  </div>
-
-                  <div className="flex gap-3 pt-1">
-                    <button type="button" onClick={()=>setPayStep(1)}
-                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm flex items-center justify-center gap-1">
-                      ← Retour
-                    </button>
-                    <button type="button" onClick={submitPayment} disabled={payLoading || !payForm.amount || parseFloat(payForm.amount)<=0}
-                      className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 text-sm">
-                      {payLoading
-                        ? <Loader2 className="w-5 h-5 animate-spin"/>
-                        : <><Send className="w-4 h-4"/> Confirmer le paiement</>
-                      }
-                    </button>
-                  </div>
+            {/* Champs spécifiques mobile money */}
+            {payForm.paymentMethod === 'mobile_money' && (
+              <div className="space-y-2.5 p-4 bg-green-50 rounded-xl border-2 border-green-300 shadow-sm">
+                <p className="text-xs font-bold text-green-800 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
+                <div>
+                  <label className="block text-xs font-semibold text-green-700 mb-1">📱 Numéro de téléphone *</label>
+                  <input placeholder="+228 XX XX XX XX" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
+                    className="w-full px-3 py-2.5 border-2 border-green-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"
+                    type="tel"/>
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-semibold text-green-700 mb-1">🔖 Référence transaction (optionnel)</label>
+                  <input placeholder="Ex: TXN-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                    className="w-full px-3 py-2.5 border-2 border-green-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
+                </div>
+              </div>
+            )}
+
+            {/* Champs spécifiques virement */}
+            {payForm.paymentMethod === 'bank_transfer' && (
+              <div className="space-y-2.5 p-4 bg-blue-50 rounded-xl border-2 border-blue-300 shadow-sm">
+                <p className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
+                {[
+                  {pl:'🏦 Nom de la banque *', k:'bankName'},
+                  {pl:'🔢 Numéro de compte *', k:'accountNumber'},
+                  {pl:'🌍 IBAN (optionnel)',    k:'iban'}
+                ].map(({pl,k})=>(
+                  <div key={k}>
+                    <label className="block text-xs font-semibold text-blue-700 mb-1">{pl}</label>
+                    <input placeholder={pl.replace(/^[^ ]+ /,'')} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
+                      className="w-full px-3 py-2.5 border-2 border-blue-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 shadow-sm"/>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Espèces / Chèque */}
+            {(payForm.paymentMethod==='cash'||payForm.paymentMethod==='check') && (
+              <div className="space-y-2.5 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-300 shadow-sm">
+                <p className="text-xs font-bold text-yellow-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Banknote className="w-3.5 h-3.5"/>{payForm.paymentMethod==='cash'?'Paiement espèces':'Paiement par chèque'}
+                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-yellow-700 mb-1">🔖 Numéro de référence / reçu</label>
+                  <input placeholder="Ex: REC-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                    className="w-full px-3 py-2.5 border-2 border-yellow-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-gray-800 shadow-sm"/>
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5">📝 Notes (optionnel)</label>
+              <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
+                placeholder="Observations, justificatifs…"
+                className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm resize-none"/>
+            </div>
+
+            {/* Boutons */}
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={()=>setPayStep(1)}
+                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm flex items-center justify-center gap-1">
+                ← Retour
+              </button>
+              <button type="button" onClick={submitPayment} disabled={payLoading}
+                className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 text-sm">
+                {payLoading
+                  ? <Loader2 className="w-5 h-5 animate-spin"/>
+                  : <><Send className="w-4 h-4"/> Confirmer le paiement</>
+                }
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  </div>
+)}
 
       {selectedPresc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={()=>setSelectedPresc(null)}>
