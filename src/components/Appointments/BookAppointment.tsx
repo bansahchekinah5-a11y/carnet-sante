@@ -169,7 +169,7 @@ const BookAppointment: React.FC = () => {
   }
 
   const formatPrice = (price: number | undefined): string => {
-    return price ? new Intl.NumberFormat('fr-FR').format(price) : '45 000'
+    return '45 000'
   }
 
   return (
