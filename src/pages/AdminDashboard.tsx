@@ -960,240 +960,283 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'payments' && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md"><DollarSign className="w-5 h-5 text-white"/></div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Paiements des médecins</h2>
-                <p className="text-sm text-gray-500">Gérez les versements et suivez les soldes</p>
-              </div>
-            </div>
+      {/* ══ PAIEMENTS ═════════════════════════════════════════════════════ */}
+{activeTab === 'payments' && (
+  <div className="space-y-6">
+    <div className="flex items-center gap-3">
+      <div className="p-2.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md"><DollarSign className="w-5 h-5 text-white"/></div>
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Paiements des médecins</h2>
+        <p className="text-sm text-gray-500">Gérez les versements et suivez les soldes</p>
+      </div>
+    </div>
 
-            {tabLoading ? <Spinner label="Calcul des revenus…"/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('payments')}/> : (
+    {tabLoading ? <Spinner label="Calcul des revenus…"/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('payments')}/> : (
+      <>
+        {/* KPIs avec calculs basés sur 45 000 XOF par consultation */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {(() => {
+            const totalConsultations = earnings.reduce((s,e)=>s+(e.stats?.completedConsultations||0),0);
+            const totalMontant = totalConsultations * 45000;
+            const totalPartMedecin = totalMontant * 0.9;
+            const totalVerse = earnings.reduce((s,e)=>s+(e.stats?.totalPaid||0),0);
+            const totalRestant = totalPartMedecin - totalVerse;
+            
+            return (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><Activity className="w-4 h-4 text-blue-400"/>Consultations totales</p>
-                    <p className="text-3xl font-bold text-blue-600">{earnings.reduce((s,e)=>s+(e.stats?.completedConsultations||0),0)}</p>
-                    <p className="text-xs text-gray-400 mt-1">Parmi tous les médecins</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-purple-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><DollarSign className="w-4 h-4 text-purple-400"/>Part totale (90%)</p>
-                    <p className="text-3xl font-bold text-purple-600">{earnings.reduce((s,e)=>s+(e.stats?.doctorShare||0),0).toFixed(0)} XOF</p>
-                    <p className="text-xs text-gray-400 mt-1">Montant total dû aux médecins</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-green-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><CheckCircle className="w-4 h-4 text-green-400"/>Total versé</p>
-                    <p className="text-3xl font-bold text-green-600">{earnings.reduce((s,e)=>s+(e.stats?.totalPaid||0),0).toFixed(0)} XOF</p>
-                    <p className="text-xs text-gray-400 mt-1">{payments.length} paiement(s) effectué(s)</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-red-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><AlertCircle className="w-4 h-4 text-red-400"/>Restant dû</p>
-                    <p className="text-3xl font-bold text-red-600">{earnings.reduce((s,e)=>s+(e.stats?.amountDue||0),0).toFixed(0)} XOF</p>
-                    <p className="text-xs text-gray-400 mt-1">{pendingPayCount} médecin(s) en attente</p>
-                  </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-5">
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><Activity className="w-4 h-4 text-blue-400"/>Consultations totales</p>
+                  <p className="text-3xl font-bold text-blue-600">{totalConsultations}</p>
+                  <p className="text-xs text-gray-400 mt-1">Montant total: {(totalConsultations * 45000).toLocaleString('fr-FR')} XOF</p>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
-                  <div className="relative shadow-md rounded-xl">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-400"/>
-                    <input type="text" placeholder="Filtrer par médecin…"
-                      value={payFilter} onChange={e => setPayFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 w-64 bg-white text-gray-700 font-medium"
-                    />
-                  </div>
+                <div className="bg-white rounded-xl border border-purple-200 shadow-md p-5">
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><DollarSign className="w-4 h-4 text-purple-400"/>Part totale (90%)</p>
+                  <p className="text-3xl font-bold text-purple-600">{totalPartMedecin.toLocaleString('fr-FR')} XOF</p>
+                  <p className="text-xs text-gray-400 mt-1">Montant total dû aux médecins</p>
                 </div>
+                <div className="bg-white rounded-xl border border-green-200 shadow-md p-5">
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><CheckCircle className="w-4 h-4 text-green-400"/>Total versé</p>
+                  <p className="text-3xl font-bold text-green-600">{totalVerse.toLocaleString('fr-FR')} XOF</p>
+                  <p className="text-xs text-gray-400 mt-1">{payments.length} paiement(s) effectué(s)</p>
+                </div>
+                <div className="bg-white rounded-xl border border-red-200 shadow-md p-5">
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><AlertCircle className="w-4 h-4 text-red-400"/>Restant dû</p>
+                  <p className="text-3xl font-bold text-red-600">{Math.max(0, totalRestant).toLocaleString('fr-FR')} XOF</p>
+                  <p className="text-xs text-gray-400 mt-1">{earnings.filter(e => {
+                    const montantConsultations = e.stats.completedConsultations * 45000;
+                    const partMedecin = montantConsultations * 0.9;
+                    return (partMedecin - (e.stats.totalPaid || 0)) > 0;
+                  }).length} médecin(s) en attente</p>
+                </div>
+              </>
+            );
+          })()}
+        </div>
 
-                {fEarn.length === 0 ? (
-                  <EmptyState icon={Users} label="Aucun médecin enregistré" sub="Les médecins apparaîtront ici dès leur inscription"/>
-                ) : (
-                  <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[1000px]">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Médecin</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Consultations</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Part (90%)</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Versé</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Restant dû</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {fEarn.map(e => {
-                            const consultations = e.stats.completedConsultations || 0;
-                            const partMedecin = e.stats.doctorShare || 0;
-                            const verse = e.stats.totalPaid || 0;
-                            const restantDu = e.stats.amountDue || 0;
-                            
-                            return (
-                              <tr key={e.doctor.id} className="hover:bg-gray-50 transition">
-                                <td className="px-4 py-4">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md shrink-0 text-sm">
-                                      {(e.doctor.firstName||'?')[0]}{(e.doctor.lastName||'?')[0]}
-                                    </div>
-                                    <div>
-                                      <p className="font-semibold text-gray-900">Dr. {e.doctor.firstName} {e.doctor.lastName}</p>
-                                      <p className="text-xs text-gray-500">{e.doctor.specialty}</p>
-                                      <p className="text-xs text-gray-400 truncate max-w-[180px]">{e.doctor.email}</p>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4 text-center">
-                                  <div className="inline-flex items-center justify-center">
-                                    <span className="text-xl font-bold text-gray-900">{consultations}</span>
-                                    <span className="ml-1 text-xs text-gray-400">consult.</span>
-                                  </div>
-                                  <p className="text-xs text-gray-400 mt-1">{e.stats.paidConsultations || 0} payées</p>
-                                </td>
-                                <td className="px-4 py-4 text-center">
-                                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
-                                    <span className="text-lg font-bold text-purple-700">{partMedecin.toLocaleString('fr-FR')}</span>
-                                    <span className="ml-1 text-xs text-purple-500">XOF</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4 text-center">
-                                  <div className="bg-green-50 border border-green-200 rounded-lg p-2">
-                                    <span className="text-lg font-bold text-green-700">{verse.toLocaleString('fr-FR')}</span>
-                                    <span className="ml-1 text-xs text-green-500">XOF</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4 text-center">
-                                  {restantDu > 0 ? (
-                                    <div className="bg-red-50 border border-red-200 rounded-lg p-2">
-                                      <span className="text-lg font-bold text-red-600">{restantDu.toLocaleString('fr-FR')}</span>
-                                      <span className="ml-1 text-xs text-red-400">XOF</span>
-                                    </div>
-                                  ) : (
-                                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-2">
-                                      <span className="text-lg font-bold text-gray-400">0</span>
-                                      <span className="ml-1 text-xs text-gray-400">XOF</span>
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-4 py-4 text-center">
-                                  <button
-                                    onClick={() => openPayModal(e)}
-                                    disabled={restantDu <= 0}
-                                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                                      restantDu > 0
-                                        ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:scale-105 shadow-md'
-                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    }`}
-                                  >
-                                    {restantDu > 0 ? (
-                                      <>
-                                        <Send className="w-4 h-4"/>
-                                        Payer
-                                      </>
-                                    ) : (
-                                      <>
-                                        <CheckCircle className="w-4 h-4"/>
-                                        À jour
-                                      </>
-                                    )}
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
+          <div className="relative shadow-md rounded-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-400"/>
+            <input type="text" placeholder="Filtrer par médecin…"
+              value={payFilter} onChange={e => setPayFilter(e.target.value)}
+              className="pl-9 pr-4 py-2.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 w-64 bg-white text-gray-700 font-medium"
+            />
+          </div>
+        </div>
 
-                    <div className="border-t border-gray-200 bg-gray-50 p-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                        <Receipt className="w-4 h-4 text-gray-500"/>
-                        Historique des derniers paiements
-                      </h4>
-                      <div className="space-y-2">
-                        {fEarn.filter(e => e.paymentHistory?.length > 0).slice(0, 3).map(e => (
-                          <div key={e.doctor.id} className="bg-white rounded-lg border border-gray-200 p-3">
-                            <p className="text-sm font-medium text-gray-800 mb-2">Dr. {e.doctor.lastName}</p>
-                            <div className="flex flex-wrap gap-2">
-                              {(e.paymentHistory || []).slice(0, 3).map((p: any, i: number) => (
-                                <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3"/>
-                                  {p.amount?.toLocaleString('fr-FR')} XOF — {p.period || fmtDate(p.processedAt)}
-                                </span>
-                              ))}
-                              {(e.paymentHistory || []).length > 3 && (
-                                <span className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-gray-500 rounded-full text-xs">
-                                  +{(e.paymentHistory || []).length - 3} autres
-                                </span>
-                              )}
+        {fEarn.length === 0 ? (
+          <EmptyState icon={Users} label="Aucun médecin enregistré" sub="Les médecins apparaîtront ici dès leur inscription"/>
+        ) : (
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1000px]">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Médecin</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Consultations</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Montant total</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Part (90%)</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Versé</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Restant dû</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {fEarn.map(e => {
+                    // Calculs basés sur 45 000 XOF par consultation
+                    const consultations = e.stats.completedConsultations || 0;
+                    const montantTotal = consultations * 45000;
+                    const partMedecin = montantTotal * 0.9; // 90% du montant total
+                    const verse = e.stats.totalPaid || 0;
+                    const restantDu = Math.max(0, partMedecin - verse);
+                    
+                    return (
+                      <tr key={e.doctor.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md shrink-0 text-sm">
+                              {(e.doctor.firstName||'?')[0]}{(e.doctor.lastName||'?')[0]}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">Dr. {e.doctor.firstName} {e.doctor.lastName}</p>
+                              <p className="text-xs text-gray-500">{e.doctor.specialty}</p>
+                              <p className="text-xs text-gray-400 truncate max-w-[180px]">{e.doctor.email}</p>
                             </div>
                           </div>
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <div className="inline-flex items-center justify-center">
+                            <span className="text-xl font-bold text-gray-900">{consultations}</span>
+                            <span className="ml-1 text-xs text-gray-400">consult.</span>
+                          </div>
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                            <span className="text-lg font-bold text-blue-700">{montantTotal.toLocaleString('fr-FR')}</span>
+                            <span className="ml-1 text-xs text-blue-500">XOF</span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">45 000 XOF/consult.</p>
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                            <span className="text-lg font-bold text-purple-700">{partMedecin.toLocaleString('fr-FR')}</span>
+                            <span className="ml-1 text-xs text-purple-500">XOF</span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">90% du total</p>
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                            <span className="text-lg font-bold text-green-700">{verse.toLocaleString('fr-FR')}</span>
+                            <span className="ml-1 text-xs text-green-500">XOF</span>
+                          </div>
+                          {verse > 0 && (
+                            <p className="text-xs text-green-600 mt-1 font-medium">✓ Payé</p>
+                          )}
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          {restantDu > 0 ? (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                              <span className="text-lg font-bold text-red-600">{restantDu.toLocaleString('fr-FR')}</span>
+                              <span className="ml-1 text-xs text-red-400">XOF</span>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-2">
+                              <span className="text-lg font-bold text-gray-400">0</span>
+                              <span className="ml-1 text-xs text-gray-400">XOF</span>
+                              <p className="text-xs text-green-600 mt-1 font-medium">✓ Soldé</p>
+                            </div>
+                          )}
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <button
+                            onClick={() => openPayModal(e)}
+                            disabled={restantDu <= 0}
+                            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                              restantDu > 0
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:scale-105 shadow-md'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {restantDu > 0 ? (
+                              <>
+                                <Send className="w-4 h-4"/>
+                                Payer {restantDu.toLocaleString('fr-FR')} XOF
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4"/>
+                                À jour
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="border-t border-gray-200 bg-gray-50 p-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-gray-500"/>
+                Historique des derniers paiements
+              </h4>
+              <div className="space-y-2">
+                {fEarn.filter(e => e.paymentHistory?.length > 0).slice(0, 3).map(e => {
+                  const consultations = e.stats.completedConsultations || 0;
+                  const montantTotal = consultations * 45000;
+                  const partMedecin = montantTotal * 0.9;
+                  return (
+                    <div key={e.doctor.id} className="bg-white rounded-lg border border-gray-200 p-3">
+                      <p className="text-sm font-medium text-gray-800 mb-2">Dr. {e.doctor.lastName} - {consultations} consultation(s) · {partMedecin.toLocaleString('fr-FR')} XOF dus</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(e.paymentHistory || []).slice(0, 3).map((p: any, i: number) => (
+                          <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3"/>
+                            {p.amount?.toLocaleString('fr-FR')} XOF — {p.period || fmtDate(p.processedAt)}
+                          </span>
                         ))}
-                        {fEarn.filter(e => e.paymentHistory?.length > 0).length === 0 && (
-                          <p className="text-sm text-gray-400 text-center py-4">Aucun historique de paiement</p>
+                        {(e.paymentHistory || []).length > 3 && (
+                          <span className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-gray-500 rounded-full text-xs">
+                            +{(e.paymentHistory || []).length - 3} autres
+                          </span>
                         )}
                       </div>
                     </div>
-                  </div>
+                  );
+                })}
+                {fEarn.filter(e => e.paymentHistory?.length > 0).length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">Aucun historique de paiement</p>
                 )}
-
-                {payments.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                      <Receipt className="w-5 h-5 text-gray-500"/>
-                      <h3 className="font-semibold text-gray-900">Historique complet des paiements</h3>
-                      <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[600px]">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Médecin</th>
-                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Montant</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Consult.</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Méthode</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Période</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {payments.map(p => {
-                            const method = PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
-                            const MI = method?.icon || Banknote;
-                            return (
-                              <tr key={p.id} className="hover:bg-gray-50 transition">
-                                <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
-                                <td className="px-4 py-3">
-                                  <p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p>
-                                  <p className="text-xs text-gray-500">{p.doctor?.specialty}</p>
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <p className="text-sm font-bold text-green-600">{p.amount?.toLocaleString('fr-FR')} {p.currency}</p>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <span className="text-sm text-gray-600">{p.consultationsCount || 0}</span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className={`flex items-center gap-1.5 text-sm ${method?.color||'text-gray-600'}`}>
-                                    <MI className="w-4 h-4"/>
-                                    {method?.label || p.paymentMethod}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{p.period || '—'}</td>
-                                <td className="px-4 py-3 text-center"><Badge status={p.status}/></td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+              </div>
+            </div>
           </div>
         )}
+
+        {payments.length > 0 && (
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-gray-500"/>
+              <h3 className="font-semibold text-gray-900">Historique complet des paiements</h3>
+              <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px]">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Médecin</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Montant</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Consult.</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Méthode</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Période</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {payments.map(p => {
+                    const method = PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
+                    const MI = method?.icon || Banknote;
+                    return (
+                      <tr key={p.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p>
+                          <p className="text-xs text-gray-500">{p.doctor?.specialty}</p>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <p className="text-sm font-bold text-green-600">{p.amount?.toLocaleString('fr-FR')} {p.currency}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-sm text-gray-600">{p.consultationsCount || 0}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`flex items-center gap-1.5 text-sm ${method?.color||'text-gray-600'}`}>
+                            <MI className="w-4 h-4"/>
+                            {method?.label || p.paymentMethod}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{p.period || '—'}</td>
+                        <td className="px-4 py-3 text-center"><Badge status={p.status}/></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+)}
 
         {activeTab === 'financial' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
