@@ -396,8 +396,9 @@ const AdminDashboard: React.FC = () => {
     if (payForm.paymentMethod === 'mobile_money' && !payForm.phoneNumber) {
       showNotification('⚠️ Numéro de téléphone requis pour Mobile Money','error'); return;
     }
+
+    setPayLoading(true);
     try {
-      setPayLoading(true);
       const details: any = {};
       if (payForm.paymentMethod === 'bank_transfer') {
         details.bankName = payForm.bankName;
@@ -424,18 +425,25 @@ const AdminDashboard: React.FC = () => {
         })
       });
 
+      // ✅ Fermer le modal et stopper le spinner IMMÉDIATEMENT
+      // indépendamment du rechargement des données
+      setPayLoading(false);
+      setShowPayModal(false);
       showNotification(
         `✅ Paiement de ${montant.toLocaleString('fr-FR')} ${payForm.currency} effectué pour Dr. ${selectedEarning.doctor.lastName}`,
         'success'
       );
-      setShowPayModal(false);
-      await fetchTab('payments');
+
+      // Recharger les données en arrière-plan (ne bloque plus le modal)
+      fetchTab('payments').catch(err => {
+        console.warn('fetchTab after payment failed (non-blocking):', err);
+      });
+
     } catch (e: any) {
+      setPayLoading(false);
       const errMsg = e?.message || 'Erreur lors du paiement';
       showNotification(`❌ ${errMsg}`, 'error');
       console.error('submitPayment error:', e);
-    } finally {
-      setPayLoading(false);
     }
   };
 
