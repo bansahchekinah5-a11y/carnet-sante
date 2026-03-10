@@ -295,6 +295,23 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
+  // Charger les RDV dès le démarrage pour alimenter les stats du tableau de bord
+  useEffect(() => {
+    const loadAppts = async () => {
+      try {
+        const r = await apiCall('/admin/appointments?limit=500');
+        const data = Array.isArray(r.data) ? r.data : (Array.isArray(r.appointments) ? r.appointments : []);
+        setAppointments(data);
+      } catch {
+        try {
+          const r = await apiCall('/appointments?limit=500');
+          setAppointments(Array.isArray(r.data) ? r.data : []);
+        } catch { /* silencieux */ }
+      }
+    };
+    loadAppts();
+  }, []);
+
   // ── Fetch par tab ─────────────────────────────────────────────────────────
   const fetchTab = useCallback(async (tab: Tab) => {
     setTabLoading(true);
@@ -411,7 +428,8 @@ const AdminDashboard: React.FC = () => {
   const fAppts = (appointments || []).filter(a => {
     const q = apptFilter.toLowerCase();
     const matchQ = !q || (`${a.doctor?.firstName||''} ${a.doctor?.lastName||''} ${a.patient?.firstName||''} ${a.patient?.lastName||''}`).toLowerCase().includes(q);
-    const matchS = !apptStatus || a.status === apptStatus;
+    const computed = getComputedStatus(a.status, a.appointmentDate, a.duration);
+    const matchS = !apptStatus || computed === apptStatus;
     return matchQ && matchS;
   });
   const fPresc  = (prescriptions || []).filter(p => { const q = prescFilter.toLowerCase(); return !q || `${p.doctor?.firstName||''} ${p.doctor?.lastName||''} ${p.patient?.firstName||''} ${p.patient?.lastName||''}`.toLowerCase().includes(q); });
@@ -523,35 +541,45 @@ const AdminDashboard: React.FC = () => {
               <>
                 {/* Cards stats */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                  {[
-                    { title:'Utilisateurs', value:stats.users.total, icon:Users, color:'from-blue-500 to-indigo-600',
-                      rows:[{l:'Médecins',v:stats.users.doctors},{l:'Patients',v:stats.users.patients},{l:'Actifs',v:stats.users.active},{l:'Inactifs',v:stats.users.inactive}] },
-                    { title:'Rendez-vous', value:stats.appointments.total, icon:Calendar, color:'from-orange-500 to-rose-500',
-                      rows:[{l:'En attente',v:stats.appointments.pending},{l:'Confirmés',v:stats.appointments.confirmed},{l:'Terminés',v:stats.appointments.completed},{l:"Aujourd'hui",v:stats.appointments.today}] },
-                    { title:'Revenus', value:`${stats.financial.totalRevenue}€`, icon:DollarSign, color:'from-emerald-500 to-teal-600',
-                      rows:[{l:'Commission',v:`${stats.financial.totalCommission}€`},{l:'En attente',v:`${stats.financial.pendingPayments}€`},{l:'Encaissé',v:`${stats.financial.completedPayments}€`}] },
-                    { title:'Calendriers', value:calendars.length, icon:Calendar, color:'from-violet-500 to-purple-600',
-                      rows:[{l:'Confirmés',v:calendars.filter(c=>c.confirmed).length},{l:'En attente',v:calendars.filter(c=>!c.confirmed).length}] },
-                  ].map((c,i) => {
-                    const Icon = c.icon;
-                    return (
-                      <div key={i} className="bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-xl hover:-translate-y-1 transition-all group">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className={`p-3 rounded-xl bg-gradient-to-br ${c.color} shadow-lg group-hover:scale-110 transition-transform`}><Icon className="w-6 h-6 text-white"/></div>
-                          <span className="text-3xl font-bold text-gray-900">{c.value}</span>
+                  {(() => {
+                    const allApts = appointments || [];
+                    const aptStats = {
+                      total:     allApts.length,
+                      pending:   allApts.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='pending').length,
+                      confirmed: allApts.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='confirmed').length,
+                      completed: allApts.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='completed').length,
+                      today:     allApts.filter(a=>new Date(a.appointmentDate).toDateString()===new Date().toDateString()).length,
+                    };
+                    return [
+                      { title:'Utilisateurs', value:stats.users.total, icon:Users, color:'from-blue-500 to-indigo-600',
+                        rows:[{l:'Médecins',v:stats.users.doctors},{l:'Patients',v:stats.users.patients},{l:'Actifs',v:stats.users.active},{l:'Inactifs',v:stats.users.inactive}] },
+                      { title:'Rendez-vous', value:aptStats.total, icon:Calendar, color:'from-orange-500 to-rose-500',
+                        rows:[{l:'En attente',v:aptStats.pending},{l:'Confirmés',v:aptStats.confirmed},{l:'Terminés',v:aptStats.completed},{l:"Aujourd'hui",v:aptStats.today}] },
+                      { title:'Revenus', value:`${stats.financial.totalRevenue}€`, icon:DollarSign, color:'from-emerald-500 to-teal-600',
+                        rows:[{l:'Commission',v:`${stats.financial.totalCommission}€`},{l:'En attente',v:`${stats.financial.pendingPayments}€`},{l:'Encaissé',v:`${stats.financial.completedPayments}€`}] },
+                      { title:'Calendriers', value:calendars.length, icon:Calendar, color:'from-violet-500 to-purple-600',
+                        rows:[{l:'Confirmés',v:calendars.filter(c=>c.confirmed).length},{l:'En attente',v:calendars.filter(c=>!c.confirmed).length}] },
+                    ].map((c,i) => {
+                      const Icon = c.icon;
+                      return (
+                        <div key={i} className="bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-xl hover:-translate-y-1 transition-all group">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className={`p-3 rounded-xl bg-gradient-to-br ${c.color} shadow-lg group-hover:scale-110 transition-transform`}><Icon className="w-6 h-6 text-white"/></div>
+                            <span className="text-3xl font-bold text-gray-900">{c.value}</span>
+                          </div>
+                          <h3 className="text-base font-semibold text-gray-900 mb-3">{c.title}</h3>
+                          <div className="space-y-1.5">
+                            {c.rows.map((r,j) => (
+                              <div key={j} className="flex justify-between text-sm px-2 py-1.5 bg-gray-50 rounded-lg">
+                                <span className="text-gray-600">{r.l}</span>
+                                <span className="font-semibold text-gray-900">{r.v}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <h3 className="text-base font-semibold text-gray-900 mb-3">{c.title}</h3>
-                        <div className="space-y-1.5">
-                          {c.rows.map((r,j) => (
-                            <div key={j} className="flex justify-between text-sm px-2 py-1.5 bg-gray-50 rounded-lg">
-                              <span className="text-gray-600">{r.l}</span>
-                              <span className="font-semibold text-gray-900">{r.v}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
 
                 {/* Activités + Calendriers */}
@@ -561,23 +589,48 @@ const AdminDashboard: React.FC = () => {
                       <Activity className="w-5 h-5 text-blue-600"/> Activité récente
                     </h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto">
-                      {(stats.recentActivities || []).length === 0 ? (
-                        <div className="text-center py-10"><Activity className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucune activité récente</p></div>
-                      ) : stats.recentActivities.map(a => {
-                        const {date,time} = fmtDT(a.timestamp);
-                        return (
-                          <div key={a.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shrink-0"><Activity className="w-4 h-4 text-white"/></div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{a.description}</p>
-                              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{date} {time}</span>
-                                <Badge status={a.status || 'completed'} />
+                      {(() => {
+                        // RDV récents triés par date (les plus récents d'abord)
+                        const recentApts = [...(appointments || [])]
+                          .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())
+                          .slice(0, 8);
+                        if (recentApts.length === 0) return (
+                          <div className="text-center py-10"><Activity className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucune activité récente</p></div>
+                        );
+                        return recentApts.map(a => {
+                          const computed = getComputedStatus(a.status, a.appointmentDate, a.duration);
+                          const statusColors: Record<string, string> = {
+                            completed: 'bg-blue-500',  ongoing: 'bg-cyan-500 animate-pulse',
+                            confirmed: 'bg-green-500',  pending: 'bg-yellow-500',
+                            cancelled: 'bg-red-500',    missed: 'bg-orange-500', no_show: 'bg-gray-500',
+                          };
+                          const statusLabels: Record<string, string> = {
+                            completed: 'Terminé', ongoing: 'En cours', confirmed: 'Confirmé',
+                            pending: 'En attente', cancelled: 'Annulé', missed: 'Manqué', no_show: 'Non honoré',
+                          };
+                          const d = new Date(a.appointmentDate);
+                          const dateStr = d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+                          const timeStr = d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+                          return (
+                            <div key={a.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-blue-200 transition">
+                              <div className={`w-8 h-8 ${statusColors[computed]||'bg-gray-400'} rounded-full flex items-center justify-center shrink-0`}>
+                                <Calendar className="w-4 h-4 text-white"/>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {a.patient?.firstName} {a.patient?.lastName} → Dr. {a.doctor?.lastName}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                  <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{dateStr} {timeStr}</span>
+                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLE[computed]||STATUS_STYLE.pending}`}>
+                                    {statusLabels[computed] || computed}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
 
@@ -628,12 +681,21 @@ const AdminDashboard: React.FC = () => {
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><Calendar className="w-5 h-5 text-orange-500"/>Statut RDV</h3>
                     <div className="space-y-2">
-                      {[{l:'En attente',v:stats.appointments.pending,dot:'bg-yellow-400 animate-pulse'},{l:'Confirmés',v:stats.appointments.confirmed,dot:'bg-green-500'},{l:'Terminés',v:stats.appointments.completed,dot:'bg-blue-500'},{l:'Annulés',v:stats.appointments.cancelled,dot:'bg-red-500'}].map(({l,v,dot})=>(
-                        <div key={l} className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                          <span className="text-gray-700 text-sm flex items-center gap-2"><span className={`w-2.5 h-2.5 ${dot} rounded-full`}/>{l}</span>
-                          <span className="font-bold text-gray-900 bg-white px-3 py-1 rounded-md shadow-sm text-sm">{v}</span>
-                        </div>
-                      ))}
+                      {(() => {
+                        const allApts = appointments || [];
+                        const ct = {
+                          pending:   allApts.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='pending').length,
+                          confirmed: allApts.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='confirmed').length,
+                          completed: allApts.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='completed').length,
+                          cancelled: allApts.filter(a=>a.status==='cancelled').length,
+                        };
+                        return [{l:'En attente',v:ct.pending,dot:'bg-yellow-400 animate-pulse'},{l:'Confirmés',v:ct.confirmed,dot:'bg-green-500'},{l:'Terminés',v:ct.completed,dot:'bg-blue-500'},{l:'Annulés',v:ct.cancelled,dot:'bg-red-500'}].map(({l,v,dot})=>(
+                          <div key={l} className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                            <span className="text-gray-700 text-sm flex items-center gap-2"><span className={`w-2.5 h-2.5 ${dot} rounded-full`}/>{l}</span>
+                            <span className="font-bold text-gray-900 bg-white px-3 py-1 rounded-md shadow-sm text-sm">{v}</span>
+                          </div>
+                        ));
+                      })()}
                     </div>
                   </div>
                   {/* Finances */}
@@ -704,11 +766,11 @@ const AdminDashboard: React.FC = () => {
             {/* Mini-stats */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
-                {l:'Total',      v:appointments.length,                                  c:'from-gray-400 to-gray-500'},
-                {l:'En attente', v:appointments.filter(a=>a.status==='pending').length,   c:'from-yellow-500 to-amber-600'},
-                {l:'Confirmés',  v:appointments.filter(a=>a.status==='confirmed').length, c:'from-green-500 to-emerald-600'},
-                {l:'Terminés',   v:appointments.filter(a=>a.status==='completed').length, c:'from-blue-500 to-indigo-600'},
-                {l:'Annulés',    v:appointments.filter(a=>a.status==='cancelled').length, c:'from-red-500 to-rose-600'},
+                {l:'Total',      v:appointments.length,                                                                                              c:'from-gray-400 to-gray-500'},
+                {l:'En attente', v:appointments.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='pending').length,              c:'from-yellow-500 to-amber-600'},
+                {l:'Confirmés',  v:appointments.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='confirmed').length,            c:'from-green-500 to-emerald-600'},
+                {l:'Terminés',   v:appointments.filter(a=>getComputedStatus(a.status,a.appointmentDate,a.duration)==='completed').length,            c:'from-blue-500 to-indigo-600'},
+                {l:'Annulés',    v:appointments.filter(a=>a.status==='cancelled').length,                                                            c:'from-red-500 to-rose-600'},
               ].map(({l,v,c})=>(
                 <div key={l} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
                   <div className={`w-10 h-10 bg-gradient-to-br ${c} rounded-lg flex items-center justify-center shadow-md shrink-0`}><Calendar className="w-5 h-5 text-white"/></div>
