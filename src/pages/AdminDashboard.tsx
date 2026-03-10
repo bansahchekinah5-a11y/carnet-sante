@@ -15,7 +15,6 @@ import { adminService, DashboardStats } from '../services/adminService';
 import { calendarService } from '../services/calendarService';
 import UserManagement from '../components/Admin/UserManagement';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface CalendarItem {
   id: string; date: string; slots: string[]; confirmed: boolean;
   doctor?: { firstName: string; lastName: string; id: string };
@@ -55,8 +54,6 @@ interface DoctorPaymentRecord {
 type Tab = 'dashboard' | 'doctors' | 'patients' | 'appointments'
          | 'prescriptions' | 'videocalls' | 'payments' | 'financial' | 'calendars';
 
-// ─── Config ───────────────────────────────────────────────────────────────────
-// ─── Opérateurs Mobile Money (Togo + Afrique de l'Ouest) ─────────────────────
 const MOBILE_OPERATORS = [
   { id: 'tmoney',   label: 'T-Money',         country: 'Togo',       color: 'bg-red-500',     text: 'text-white',       border: 'border-red-500',    ring: 'ring-red-400',    emoji: '🔴' },
   { id: 'flooz',    label: 'Flooz (Moov)',     country: 'Togo',       color: 'bg-blue-600',    text: 'text-white',       border: 'border-blue-600',   ring: 'ring-blue-400',   emoji: '🔵' },
@@ -75,7 +72,6 @@ const PAYMENT_METHODS = [
   { value: 'check',         label: 'Chèque',            icon: Receipt,    color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d?: string) => {
   if (!d) return '—';
   try { return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' }); }
@@ -103,7 +99,6 @@ const STATUS_LABEL: Record<string,string> = {
   processing:'En traitement', filled:'Délivré', expired:'Expiré',
 };
 
-// ─── Appel API brut (utilise le token JWT stocké) ─────────────────────────────
 const apiCall = async (path: string, options: RequestInit = {}): Promise<any> => {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const BASE = (import.meta as any).env?.VITE_API_URL || 'https://carnet-sante-backend.onrender.com/api';
@@ -121,7 +116,6 @@ const apiCall = async (path: string, options: RequestInit = {}): Promise<any> =>
   return data;
 };
 
-// ─── Sous-composants ──────────────────────────────────────────────────────────
 const Badge = ({ status }: { status: string }) => (
   <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${STATUS_STYLE[status] || STATUS_STYLE.pending}`}>
     {STATUS_LABEL[status] || status}
@@ -154,7 +148,6 @@ const ApiError = ({ error, retry }: { error: string; retry: () => void }) => (
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
 const AdminDashboard: React.FC = () => {
   const { user, logout }     = useAuth();
   const { showNotification } = useNotification();
@@ -162,7 +155,6 @@ const AdminDashboard: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
 
-  // ── État données ──
   const [stats, setStats] = useState<DashboardStats>({
     users: { total:0, doctors:0, patients:0, admins:0, active:0, inactive:0 },
     appointments: { total:0, pending:0, confirmed:0, completed:0, cancelled:0, today:0, thisWeek:0, thisMonth:0 },
@@ -176,34 +168,24 @@ const AdminDashboard: React.FC = () => {
   const [earnings, setEarnings]           = useState<DoctorEarning[]>([]);
   const [payments, setPayments]           = useState<DoctorPaymentRecord[]>([]);
 
-  // ── État chargement/erreur par tab ──
   const [dashLoading, setDashLoading]   = useState(true);
   const [tabLoading, setTabLoading]     = useState(false);
   const [tabError, setTabError]         = useState<string | null>(null);
 
-  // ── 🕐 Horloge temps réel — recalcule les statuts toutes les 30s ──────────
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
 
-  /** Calcule le statut affiché en anticipant côté client (le scheduler backend
-   *  met à jour toutes les minutes, le frontend anticipe visuellement). */
   const getComputedStatus = (dbStatus: string, appointmentDate?: string, duration: number = 30): string => {
-    // Statuts finaux immuables — on ne recalcule pas le temps
     if (['cancelled', 'no_show'].includes(dbStatus)) return dbStatus;
     if (!appointmentDate) return dbStatus;
-
     const start = new Date(appointmentDate).getTime();
     const end   = start + (duration || 30) * 60 * 1000;
     const t     = now.getTime();
-
-    // Si l'heure de fin est passée → Terminé (quel que soit le statut DB)
     if (t >= end)   return 'completed';
-    // Si on est dans la plage horaire → En cours (seulement si déjà confirmé ou en cours)
     if (t >= start) return (dbStatus === 'confirmed' || dbStatus === 'ongoing') ? 'ongoing' : dbStatus;
-    // RDV futur → on retourne le statut DB tel quel (pending, confirmed…)
     return dbStatus;
   };
 
@@ -226,14 +208,12 @@ const AdminDashboard: React.FC = () => {
     missed:    'bg-orange-100 text-orange-700 border-orange-200',
   };
 
-  // ── Filtres ──
   const [apptFilter,  setApptFilter]  = useState('');
   const [apptStatus,  setApptStatus]  = useState('');
   const [prescFilter, setPrescFilter] = useState('');
   const [videoFilter, setVideoFilter] = useState('');
   const [payFilter, setPayFilter]     = useState('');
 
-  // ── Modal paiement ──
   const [showPayModal,     setShowPayModal]     = useState(false);
   const [payStep,          setPayStep]          = useState<1|2>(1);
   const [selectedEarning,  setSelectedEarning]  = useState<DoctorEarning | null>(null);
@@ -245,13 +225,8 @@ const AdminDashboard: React.FC = () => {
     provider:'', phoneNumber:'', reference:''
   });
 
-  // ── Modal prescription ──
   const [selectedPresc, setSelectedPresc] = useState<AdminPrescription | null>(null);
-
-  // ── Modal déconnexion ──
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-
-  // ── Dropdown notifications ──
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const notifBtnRef = useRef<HTMLButtonElement>(null);
   const notifRef    = useRef<HTMLDivElement>(null);
@@ -276,7 +251,6 @@ const AdminDashboard: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Fetch dashboard ───────────────────────────────────────────────────────
   const fetchDashboard = useCallback(async () => {
     try {
       setDashLoading(true);
@@ -295,7 +269,6 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
-  // Charger les RDV dès le démarrage pour alimenter les stats du tableau de bord
   useEffect(() => {
     const loadAppts = async () => {
       try {
@@ -312,7 +285,6 @@ const AdminDashboard: React.FC = () => {
     loadAppts();
   }, []);
 
-  // ── Fetch par tab ─────────────────────────────────────────────────────────
   const fetchTab = useCallback(async (tab: Tab) => {
     setTabLoading(true);
     setTabError(null);
@@ -357,7 +329,6 @@ const AdminDashboard: React.FC = () => {
     }
   }, [activeTab, fetchTab]);
 
-  // ── Actions ───────────────────────────────────────────────────────────────
   const handleDeleteCalendar = async (id: string) => {
     if (!window.confirm('Supprimer ce calendrier ?')) return;
     try {
@@ -368,82 +339,58 @@ const AdminDashboard: React.FC = () => {
   };
 
   const openPayModal = (e: DoctorEarning) => {
-    // Calcul correct : 45 000 XOF par consultation, 90% pour le médecin
-    const consultations  = e.stats.unpaidConsultations || 0;
-    const montantTotal   = consultations * 45000;
-    const partMedecin    = Math.round(montantTotal * 0.9);
-
     setSelectedEarning(e);
     setPayStep(1);
     setSelectedOperator('');
     setPayForm(f => ({
       ...f,
-      paymentMethod:      'mobile_money',
-      amount:             partMedecin.toString(),          // ← montant XOF correct
-      consultationsCount: consultations.toString(),
-      period:             new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'}),
-      phoneNumber:        e.doctor.phoneNumber || '',
-      bankName:'', accountNumber:'', iban:'', provider:'', reference:'', notes:''
+      paymentMethod: 'mobile_money',
+      amount: e.stats.amountDue.toString(),
+      consultationsCount: e.stats.unpaidConsultations.toString(),
+      period: new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'}),
+      phoneNumber: e.doctor.phoneNumber || '',
+      bankName:'', accountNumber:'', iban:'', provider:'', reference:''
     }));
     setShowPayModal(true);
   };
 
   const submitPayment = async () => {
-    const montant = parseFloat(payForm.amount);
-    if (!selectedEarning || !payForm.amount || isNaN(montant) || montant <= 0) {
-      showNotification('⚠️ Montant invalide — veuillez vérifier le montant','error'); return;
-    }
-    if (payForm.paymentMethod === 'mobile_money' && !payForm.phoneNumber) {
-      showNotification('⚠️ Numéro de téléphone requis pour Mobile Money','error'); return;
+    if (!selectedEarning || !payForm.amount || parseFloat(payForm.amount) <= 0) {
+      showNotification('Montant invalide','error'); return;
     }
     try {
       setPayLoading(true);
       const details: any = {};
-      if (payForm.paymentMethod === 'bank_transfer') {
-        details.bankName = payForm.bankName;
-        details.accountNumber = payForm.accountNumber;
-        details.iban = payForm.iban;
-      } else if (payForm.paymentMethod === 'mobile_money') {
-        details.provider = selectedOperator || payForm.provider;
-        details.phoneNumber = payForm.phoneNumber;
-      } else {
-        details.reference = payForm.reference;
-      }
+      if (payForm.paymentMethod === 'bank_transfer') { details.bankName = payForm.bankName; details.accountNumber = payForm.accountNumber; details.iban = payForm.iban; }
+      else if (payForm.paymentMethod === 'mobile_money') { details.provider = selectedOperator || payForm.provider; details.phoneNumber = payForm.phoneNumber; }
+      else { details.reference = payForm.reference; }
 
       await apiCall('/admin/doctor-payments', {
         method: 'POST',
         body: JSON.stringify({
-          doctorId:           selectedEarning.doctor.id,
-          amount:             montant,
-          currency:           payForm.currency,
-          paymentMethod:      payForm.paymentMethod,
-          paymentDetails:     details,
-          period:             payForm.period,
+          doctorId: selectedEarning.doctor.id,
+          amount: parseFloat(payForm.amount),
+          currency: payForm.currency,
+          paymentMethod: payForm.paymentMethod,
+          paymentDetails: details,
+          period: payForm.period,
           consultationsCount: parseInt(payForm.consultationsCount) || 0,
-          notes:              payForm.notes || ''
+          notes: payForm.notes
         })
       });
 
-      showNotification(
-        `✅ Paiement de ${montant.toLocaleString('fr-FR')} ${payForm.currency} effectué pour Dr. ${selectedEarning.doctor.lastName}`,
-        'success'
-      );
+      showNotification(`✅ Paiement de ${payForm.amount} ${payForm.currency} effectué pour Dr. ${selectedEarning.doctor.lastName}`,'success');
       setShowPayModal(false);
       await fetchTab('payments');
     } catch (e: any) {
-      const errMsg = e?.message || 'Erreur lors du paiement';
-      showNotification(`❌ ${errMsg}`, 'error');
-      console.error('submitPayment error:', e);
-    } finally {
-      setPayLoading(false);
-    }
+      showNotification(e?.message || 'Erreur paiement','error');
+    } finally { setPayLoading(false); }
   };
 
   const handleLogout = () => {
     logout(); navigate('/login');
   };
 
-  // ── Données filtrées ──────────────────────────────────────────────────────
   const APPT_STATUS_LABELS: Record<string,string> = {
     pending:'En attente', confirmed:'Confirmé', ongoing:'En cours',
     completed:'Terminé', cancelled:'Annulé', no_show:'Absent', missed:'Manqué'
@@ -462,7 +409,6 @@ const AdminDashboard: React.FC = () => {
   const pendingPayCount  = (earnings || []).filter(e => e.stats?.amountDue > 0).length;
   const unreadPrescCount = (prescriptions || []).filter(p => !p.isRead).length;
 
-  // ── Tabs navigation ───────────────────────────────────────────────────────
   const NAV: { id: Tab; label: string; icon: any; badge?: number }[] = [
     { id:'dashboard',     label:'Tableau de bord', icon:BarChart3  },
     { id:'doctors',       label:'Médecins',        icon:UserCheck  },
@@ -475,13 +421,8 @@ const AdminDashboard: React.FC = () => {
     { id:'calendars',     label:'Calendriers',     icon:Calendar    },
   ];
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* ── HEADER ──────────────────────────────────────────────────────────── */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -497,8 +438,6 @@ const AdminDashboard: React.FC = () => {
             <button onClick={fetchDashboard} title="Actualiser" className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
               <RefreshCw className="w-4 h-4 text-gray-600" />
             </button>
-
-            {/* 🔔 Cloche cliquable */}
             <div className="relative">
               <button
                 ref={notifBtnRef}
@@ -514,7 +453,6 @@ const AdminDashboard: React.FC = () => {
                 </span>
               )}
             </div>
-
             <button
               onClick={() => setShowLogoutModal(true)}
               className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg flex items-center gap-2 text-sm font-medium shadow-md transition-all"
@@ -525,7 +463,6 @@ const AdminDashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* ── TABS ────────────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200 bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
@@ -554,15 +491,11 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── CONTENU ─────────────────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        {/* ══ DASHBOARD ══════════════════════════════════════════════════════ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             {dashLoading ? <Spinner /> : (
               <>
-                {/* Cards stats */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                   {(() => {
                     const allApts = appointments || [];
@@ -605,7 +538,6 @@ const AdminDashboard: React.FC = () => {
                   })()}
                 </div>
 
-                {/* Activités + Calendriers */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100">
@@ -619,7 +551,6 @@ const AdminDashboard: React.FC = () => {
                         if (recentApts.length === 0) return (
                           <div className="text-center py-10"><Activity className="w-10 h-10 text-gray-200 mx-auto mb-2"/><p className="text-sm text-gray-400">Aucune activité récente</p></div>
                         );
-                        // Chaque statut a sa propre couleur d'icône + badge distinct
                         const STATUS_META: Record<string, { bg: string; icon: string; label: string; pill: string; dot: string }> = {
                           completed: { bg:'bg-blue-100',   icon:'text-blue-600',   label:'Terminé',     pill:'bg-blue-100 text-blue-700 border-blue-300',     dot:'bg-blue-500'   },
                           ongoing:   { bg:'bg-cyan-100',   icon:'text-cyan-600',   label:'En cours',    pill:'bg-cyan-100 text-cyan-700 border-cyan-300 animate-pulse',     dot:'bg-cyan-500'   },
@@ -637,20 +568,17 @@ const AdminDashboard: React.FC = () => {
                           const timeStr = d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
                           return (
                             <div key={a.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all">
-                              {/* Icône colorée */}
                               <div className={`w-9 h-9 ${meta.bg} rounded-xl flex items-center justify-center shrink-0 shadow-sm`}>
                                 <span className={`text-base ${meta.icon}`}>
                                   {computed==='completed'?'✓':computed==='ongoing'?'▶':computed==='confirmed'?'📅':computed==='pending'?'⏳':computed==='cancelled'?'✕':computed==='missed'?'⚠':'👻'}
                                 </span>
                               </div>
-                              {/* Infos */}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-gray-900 truncate">
                                   {a.patient?.firstName} {a.patient?.lastName}
                                 </p>
                                 <p className="text-xs text-gray-500 truncate">Dr. {a.doctor?.lastName} • {a.motif || a.reason || '—'}</p>
                               </div>
-                              {/* Date + badge statut */}
                               <div className="flex flex-col items-end gap-1 shrink-0">
                                 <span className="text-xs text-gray-400 font-medium">{dateStr} {timeStr}</span>
                                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${meta.pill}`}>
@@ -694,9 +622,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 3 mini-panels */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Répartition */}
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-blue-600"/>Répartition</h3>
                     <div className="space-y-3">
@@ -708,7 +634,6 @@ const AdminDashboard: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                  {/* Statut RDV */}
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><Calendar className="w-5 h-5 text-orange-500"/>Statut RDV</h3>
                     <div className="space-y-2">
@@ -729,7 +654,6 @@ const AdminDashboard: React.FC = () => {
                       })()}
                     </div>
                   </div>
-                  {/* Finances */}
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-500"/>Performance financière</h3>
                     <div className="space-y-3">
@@ -744,7 +668,6 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ MÉDECINS ══════════════════════════════════════════════════════ */}
         {activeTab === 'doctors' && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -755,7 +678,6 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ PATIENTS ══════════════════════════════════════════════════════ */}
         {activeTab === 'patients' && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -766,10 +688,8 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ RENDEZ-VOUS ═══════════════════════════════════════════════════ */}
         {activeTab === 'appointments' && (
           <div className="space-y-5">
-            {/* En-tête */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl shadow-md"><Calendar className="w-5 h-5 text-white"/></div>
@@ -794,7 +714,6 @@ const AdminDashboard: React.FC = () => {
                 </button>
               </div>
             </div>
-            {/* Mini-stats */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
                 {l:'Total',      v:appointments.length,                                                                                              c:'from-gray-400 to-gray-500'},
@@ -831,7 +750,6 @@ const AdminDashboard: React.FC = () => {
                       const dateStr = dt ? dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
                       const timeStr = dt ? dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '—';
                       const typeLabels: Record<string,string> = {in_person:'Présentiel',teleconsultation:'Téléconsult.',home_visit:'Domicile'};
-                      // ── Statut calculé dynamiquement ──────────────────────
                       const computed = getComputedStatus(a.status, a.appointmentDate, a.duration);
                       return (
                         <tr key={a.id} className={`hover:bg-gray-50 transition ${computed === 'ongoing' ? 'bg-blue-50/40' : ''}`}>
@@ -889,10 +807,8 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ ORDONNANCES ═══════════════════════════════════════════════════ */}
         {activeTab === 'prescriptions' && (
           <div className="space-y-5">
-            {/* En-tête */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-md"><Pill className="w-5 h-5 text-white"/></div>
@@ -910,7 +826,6 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Mini-stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 {l:'Total',      v:prescriptions.length,                              c:'from-gray-400 to-gray-500'},
@@ -975,7 +890,6 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ APPELS VIDÉO ══════════════════════════════════════════════════ */}
         {activeTab === 'videocalls' && (
           <div className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1046,164 +960,284 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ PAIEMENTS ═════════════════════════════════════════════════════ */}
-        {activeTab === 'payments' && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md"><DollarSign className="w-5 h-5 text-white"/></div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Paiements des médecins</h2>
-                <p className="text-sm text-gray-500">Gérez les versements et suivez les soldes</p>
-              </div>
-            </div>
+      {/* ══ PAIEMENTS ═════════════════════════════════════════════════════ */}
+{activeTab === 'payments' && (
+  <div className="space-y-6">
+    <div className="flex items-center gap-3">
+      <div className="p-2.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-md"><DollarSign className="w-5 h-5 text-white"/></div>
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Paiements des médecins</h2>
+        <p className="text-sm text-gray-500">Gérez les versements et suivez les soldes</p>
+      </div>
+    </div>
 
-            {tabLoading ? <Spinner label="Calcul des revenus…"/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('payments')}/> : (
+    {tabLoading ? <Spinner label="Calcul des revenus…"/> : tabError ? <ApiError error={tabError} retry={() => fetchTab('payments')}/> : (
+      <>
+        {/* KPIs avec calculs basés sur 45 000 XOF par consultation */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {(() => {
+            const totalConsultations = earnings.reduce((s,e)=>s+(e.stats?.completedConsultations||0),0);
+            const totalMontant = totalConsultations * 45000;
+            const totalPartMedecin = totalMontant * 0.9;
+            const totalVerse = earnings.reduce((s,e)=>s+(e.stats?.totalPaid||0),0);
+            const totalRestant = totalPartMedecin - totalVerse;
+            
+            return (
               <>
-                {/* KPIs */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-xl border border-red-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><AlertCircle className="w-4 h-4 text-red-400"/>Total dû aux médecins</p>
-                    <p className="text-3xl font-bold text-red-600">{earnings.reduce((s,e)=>s+(e.stats?.amountDue||0),0).toFixed(0)} XOF</p>
-                    <p className="text-xs text-gray-400 mt-1">{pendingPayCount} médecin(s) en attente</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-green-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><CheckCircle className="w-4 h-4 text-green-400"/>Total déjà versé</p>
-                    <p className="text-3xl font-bold text-green-600">{earnings.reduce((s,e)=>s+(e.stats?.totalPaid||0),0).toFixed(0)} XOF</p>
-                    <p className="text-xs text-gray-400 mt-1">{payments.length} paiement(s) effectué(s)</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-blue-200 shadow-md p-5">
-                    <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><Activity className="w-4 h-4 text-blue-400"/>Consultations totales</p>
-                    <p className="text-3xl font-bold text-blue-600">{earnings.reduce((s,e)=>s+(e.stats?.completedConsultations||0),0)}</p>
-                    <p className="text-xs text-gray-400 mt-1">Parmi tous les médecins</p>
-                  </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-5">
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><Activity className="w-4 h-4 text-blue-400"/>Consultations totales</p>
+                  <p className="text-3xl font-bold text-blue-600">{totalConsultations}</p>
+                  <p className="text-xs text-gray-400 mt-1">Montant total: {(totalConsultations * 45000).toLocaleString('fr-FR')} XOF</p>
                 </div>
-
-                {/* Filtre + liste */}
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
-                  <div className="relative shadow-md rounded-xl">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-400"/>
-                    <input type="text" placeholder="Filtrer par médecin…"
-                      value={payFilter} onChange={e => setPayFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 w-64 bg-white text-gray-700 font-medium"
-                    />
-                  </div>
+                <div className="bg-white rounded-xl border border-purple-200 shadow-md p-5">
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><DollarSign className="w-4 h-4 text-purple-400"/>Part totale (90%)</p>
+                  <p className="text-3xl font-bold text-purple-600">{totalPartMedecin.toLocaleString('fr-FR')} XOF</p>
+                  <p className="text-xs text-gray-400 mt-1">Montant total dû aux médecins</p>
                 </div>
+                <div className="bg-white rounded-xl border border-green-200 shadow-md p-5">
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><CheckCircle className="w-4 h-4 text-green-400"/>Total versé</p>
+                  <p className="text-3xl font-bold text-green-600">{totalVerse.toLocaleString('fr-FR')} XOF</p>
+                  <p className="text-xs text-gray-400 mt-1">{payments.length} paiement(s) effectué(s)</p>
+                </div>
+                <div className="bg-white rounded-xl border border-red-200 shadow-md p-5">
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1"><AlertCircle className="w-4 h-4 text-red-400"/>Restant dû</p>
+                  <p className="text-3xl font-bold text-red-600">{Math.max(0, totalRestant).toLocaleString('fr-FR')} XOF</p>
+                  <p className="text-xs text-gray-400 mt-1">{earnings.filter(e => {
+                    const montantConsultations = e.stats.completedConsultations * 45000;
+                    const partMedecin = montantConsultations * 0.9;
+                    return (partMedecin - (e.stats.totalPaid || 0)) > 0;
+                  }).length} médecin(s) en attente</p>
+                </div>
+              </>
+            );
+          })()}
+        </div>
 
-                {fEarn.length === 0 ? (
-                  <EmptyState icon={Users} label="Aucun médecin enregistré" sub="Les médecins apparaîtront ici dès leur inscription"/>
-                ) : (
-                  <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                    <div className="divide-y divide-gray-100">
-                      {fEarn.map(e => (
-                        <div key={e.doctor.id} className="p-5 hover:bg-gray-50 transition">
-                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                            {/* Identité */}
-                            <div className="flex items-center gap-4 min-w-0">
-                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md shrink-0 text-lg">
-                                {(e.doctor.firstName||'?')[0]}{(e.doctor.lastName||'?')[0]}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-semibold text-gray-900">Dr. {e.doctor.firstName} {e.doctor.lastName}</p>
-                                <p className="text-sm text-gray-500 truncate">{e.doctor.specialty}</p>
-                                <p className="text-xs text-gray-400 truncate">{e.doctor.email}</p>
-                              </div>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Revenus par médecin</h3>
+          <div className="relative shadow-md rounded-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-400"/>
+            <input type="text" placeholder="Filtrer par médecin…"
+              value={payFilter} onChange={e => setPayFilter(e.target.value)}
+              className="pl-9 pr-4 py-2.5 border-2 border-green-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400 w-64 bg-white text-gray-700 font-medium"
+            />
+          </div>
+        </div>
+
+        {fEarn.length === 0 ? (
+          <EmptyState icon={Users} label="Aucun médecin enregistré" sub="Les médecins apparaîtront ici dès leur inscription"/>
+        ) : (
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1000px]">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Médecin</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Consultations</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Montant total</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Part (90%)</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Versé</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Restant dû</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {fEarn.map(e => {
+                    // Calculs basés sur 45 000 XOF par consultation
+                    const consultations = e.stats.completedConsultations || 0;
+                    const montantTotal = consultations * 45000;
+                    const partMedecin = montantTotal * 0.9; // 90% du montant total
+                    const verse = e.stats.totalPaid || 0;
+                    const restantDu = Math.max(0, partMedecin - verse);
+                    
+                    return (
+                      <tr key={e.doctor.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md shrink-0 text-sm">
+                              {(e.doctor.firstName||'?')[0]}{(e.doctor.lastName||'?')[0]}
                             </div>
-                            {/* Chiffres */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-4">
-                              <div className="text-center p-2 bg-gray-50 rounded-xl">
-                                <p className="text-xs text-gray-500 leading-tight">Consultations</p>
-                                <p className="font-bold text-gray-900 text-xl">{e.stats.completedConsultations}</p>
-                                <p className="text-xs text-gray-400">{e.stats.paidConsultations} payées</p>
-                              </div>
-                              <div className="text-center p-2 bg-blue-50 border border-blue-100 rounded-xl">
-                                <p className="text-xs text-blue-500 leading-tight">Part (90%)</p>
-                                <p className="font-bold text-blue-700 text-lg">{e.stats.doctorShare}</p>
-                                <p className="text-xs text-blue-400">XOF</p>
-                              </div>
-                              <div className="text-center p-2 bg-green-50 border border-green-100 rounded-xl">
-                                <p className="text-xs text-green-500 leading-tight">Versé</p>
-                                <p className="font-bold text-green-700 text-lg">{e.stats.totalPaid}</p>
-                                <p className="text-xs text-green-400">XOF</p>
-                              </div>
-                              <div className={`text-center p-2 rounded-xl border ${e.stats.amountDue > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
-                                <p className={`text-xs leading-tight ${e.stats.amountDue > 0 ? 'text-red-500' : 'text-gray-400'}`}>Restant dû</p>
-                                <p className={`font-bold text-xl ${e.stats.amountDue > 0 ? 'text-red-600' : 'text-gray-300'}`}>{e.stats.amountDue}</p>
-                                <p className={`text-xs ${e.stats.amountDue > 0 ? 'text-red-400' : 'text-gray-300'}`}>XOF</p>
-                              </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">Dr. {e.doctor.firstName} {e.doctor.lastName}</p>
+                              <p className="text-xs text-gray-500">{e.doctor.specialty}</p>
+                              <p className="text-xs text-gray-400 truncate max-w-[180px]">{e.doctor.email}</p>
                             </div>
-                            {/* Bouton */}
-                            <button
-                              onClick={() => openPayModal(e)}
-                              disabled={e.stats.amountDue <= 0}
-                              className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${
-                                e.stats.amountDue > 0
-                                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:scale-105 shadow-md'
-                                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              }`}
-                            >
-                              <Send className="w-4 h-4"/>
-                              {e.stats.amountDue > 0 ? 'Payer' : '✓ À jour'}
-                            </button>
                           </div>
-                          {/* Historique mini */}
-                          {(e.paymentHistory||[]).length > 0 && (
-                            <div className="mt-3 ml-16 flex flex-wrap gap-2">
-                              {e.paymentHistory.slice(0,3).map((p:any,i:number)=>(
-                                <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs">
-                                  ✓ {p.amount} {p.currency||'XOF'} — {p.period || fmtDate(p.processedAt)}
-                                </span>
-                              ))}
-                              {e.paymentHistory.length > 3 && <span className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-full text-xs">+{e.paymentHistory.length-3}</span>}
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <div className="inline-flex items-center justify-center">
+                            <span className="text-xl font-bold text-gray-900">{consultations}</span>
+                            <span className="ml-1 text-xs text-gray-400">consult.</span>
+                          </div>
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                            <span className="text-lg font-bold text-blue-700">{montantTotal.toLocaleString('fr-FR')}</span>
+                            <span className="ml-1 text-xs text-blue-500">XOF</span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">45 000 XOF/consult.</p>
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                            <span className="text-lg font-bold text-purple-700">{partMedecin.toLocaleString('fr-FR')}</span>
+                            <span className="ml-1 text-xs text-purple-500">XOF</span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">90% du total</p>
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                            <span className="text-lg font-bold text-green-700">{verse.toLocaleString('fr-FR')}</span>
+                            <span className="ml-1 text-xs text-green-500">XOF</span>
+                          </div>
+                          {verse > 0 && (
+                            <p className="text-xs text-green-600 mt-1 font-medium">✓ Payé</p>
+                          )}
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          {restantDu > 0 ? (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                              <span className="text-lg font-bold text-red-600">{restantDu.toLocaleString('fr-FR')}</span>
+                              <span className="ml-1 text-xs text-red-400">XOF</span>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-2">
+                              <span className="text-lg font-bold text-gray-400">0</span>
+                              <span className="ml-1 text-xs text-gray-400">XOF</span>
+                              <p className="text-xs text-green-600 mt-1 font-medium">✓ Soldé</p>
                             </div>
                           )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                        </td>
+                        
+                        <td className="px-4 py-4 text-center">
+                          <button
+                            onClick={() => openPayModal(e)}
+                            disabled={restantDu <= 0}
+                            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                              restantDu > 0
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:scale-105 shadow-md'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {restantDu > 0 ? (
+                              <>
+                                <Send className="w-4 h-4"/>
+                                Payer {restantDu.toLocaleString('fr-FR')} XOF
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4"/>
+                                À jour
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-                {/* Historique global */}
-                {payments.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-                      <Receipt className="w-5 h-5 text-gray-500"/>
-                      <h3 className="font-semibold text-gray-900">Historique complet des paiements</h3>
-                      <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
+            <div className="border-t border-gray-200 bg-gray-50 p-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-gray-500"/>
+                Historique des derniers paiements
+              </h4>
+              <div className="space-y-2">
+                {fEarn.filter(e => e.paymentHistory?.length > 0).slice(0, 3).map(e => {
+                  const consultations = e.stats.completedConsultations || 0;
+                  const montantTotal = consultations * 45000;
+                  const partMedecin = montantTotal * 0.9;
+                  return (
+                    <div key={e.doctor.id} className="bg-white rounded-lg border border-gray-200 p-3">
+                      <p className="text-sm font-medium text-gray-800 mb-2">Dr. {e.doctor.lastName} - {consultations} consultation(s) · {partMedecin.toLocaleString('fr-FR')} XOF dus</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(e.paymentHistory || []).slice(0, 3).map((p: any, i: number) => (
+                          <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3"/>
+                            {p.amount?.toLocaleString('fr-FR')} XOF — {p.period || fmtDate(p.processedAt)}
+                          </span>
+                        ))}
+                        {(e.paymentHistory || []).length > 3 && (
+                          <span className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-gray-500 rounded-full text-xs">
+                            +{(e.paymentHistory || []).length - 3} autres
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[600px]">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>{['Date','Médecin','Montant','Méthode','Période','Statut'].map(h=>(
-                            <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                          ))}</tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {payments.map(p => {
-                            const method = PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
-                            const MI = method?.icon || Banknote;
-                            return (
-                              <tr key={p.id} className="hover:bg-gray-50 transition">
-                                <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
-                                <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p><p className="text-xs text-gray-500">{p.doctor?.specialty}</p></td>
-                                <td className="px-4 py-3"><p className="text-sm font-bold text-green-600">{p.amount} {p.currency}</p><p className="text-xs text-gray-400">{p.consultationsCount} consult.</p></td>
-                                <td className="px-4 py-3"><span className={`flex items-center gap-1.5 text-sm ${method?.color||'text-gray-600'}`}><MI className="w-4 h-4"/>{method?.label||p.paymentMethod}</span></td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{p.period||'—'}</td>
-                                <td className="px-4 py-3"><Badge status={p.status}/></td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  );
+                })}
+                {fEarn.filter(e => e.paymentHistory?.length > 0).length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">Aucun historique de paiement</p>
                 )}
-              </>
-            )}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ══ FINANCES ══════════════════════════════════════════════════════ */}
+        {payments.length > 0 && (
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-gray-500"/>
+              <h3 className="font-semibold text-gray-900">Historique complet des paiements</h3>
+              <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px]">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Médecin</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Montant</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Consult.</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Méthode</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Période</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {payments.map(p => {
+                    const method = PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
+                    const MI = method?.icon || Banknote;
+                    return (
+                      <tr key={p.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p>
+                          <p className="text-xs text-gray-500">{p.doctor?.specialty}</p>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <p className="text-sm font-bold text-green-600">{p.amount?.toLocaleString('fr-FR')} {p.currency}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-sm text-gray-600">{p.consultationsCount || 0}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`flex items-center gap-1.5 text-sm ${method?.color||'text-gray-600'}`}>
+                            <MI className="w-4 h-4"/>
+                            {method?.label || p.paymentMethod}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{p.period || '—'}</td>
+                        <td className="px-4 py-3 text-center"><Badge status={p.status}/></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+)}
+
         {activeTab === 'financial' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
@@ -1241,7 +1275,6 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ══ CALENDRIERS ═══════════════════════════════════════════════════ */}
         {activeTab === 'calendars' && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-gray-900">Gestion des calendriers ({calendars.length})</h2>
@@ -1277,153 +1310,178 @@ const AdminDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* ══════════════ MODAL PAIEMENT — 2 ÉTAPES ════════════════════════════ */}
-      {showPayModal && selectedEarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+     {/* ══════════════ MODAL PAIEMENT — 2 ÉTAPES ════════════════════════════ */}
+{showPayModal && selectedEarning && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden">
 
-            {/* ── Header ── */}
-            <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md text-white font-bold text-lg">
-                  {selectedEarning.doctor.firstName[0]}{selectedEarning.doctor.lastName[0]}
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md text-white font-bold text-lg">
+            {selectedEarning.doctor.firstName[0]}{selectedEarning.doctor.lastName[0]}
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">
+              Payer Dr. {selectedEarning.doctor.firstName} {selectedEarning.doctor.lastName}
+            </h2>
+            <p className="text-xs text-gray-500">{selectedEarning.doctor.specialty}</p>
+          </div>
+        </div>
+        <button onClick={() => setShowPayModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition">
+          <X className="w-5 h-5 text-gray-500"/>
+        </button>
+      </div>
+
+      {/* ── Stepper ── */}
+      <div className="flex items-center gap-2 px-6 pt-4 pb-2">
+        {[{n:1,l:'Méthode de paiement'},{n:2,l:'Détails & confirmation'}].map(({n,l})=>(
+          <React.Fragment key={n}>
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${payStep>=n?'bg-green-500 text-white shadow-md':'bg-gray-200 text-gray-500'}`}>{n}</div>
+              <span className={`text-xs font-medium transition-colors ${payStep>=n?'text-green-600':'text-gray-400'}`}>{l}</span>
+            </div>
+            {n<2 && <div className={`flex-1 h-0.5 transition-all ${payStep>=2?'bg-green-400':'bg-gray-200'}`}/>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="p-6 max-h-[65vh] overflow-y-auto">
+
+        {/* ══════ ÉTAPE 1 : Méthode de paiement ══════ */}
+        {payStep === 1 && (
+          <div className="space-y-5">
+            {/* Résumé médecin avec calculs corrigés */}
+            {(() => {
+              const consultations = selectedEarning.stats.unpaidConsultations || 0;
+              const montantTotal = consultations * 45000; // 45 000 XOF par consultation
+              const partMedecin = montantTotal * 0.9; // 90% pour le médecin
+              
+              return (
+                <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 leading-tight mb-1">Consultations impayées</p>
+                    <p className="text-xl font-bold text-gray-900">{consultations}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 leading-tight mb-1">Montant dû</p>
+                    <p className="text-xl font-bold text-red-600">{montantTotal.toLocaleString('fr-FR')} XOF</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 leading-tight mb-1">Part médecin</p>
+                    <p className="text-xl font-bold text-blue-600">{partMedecin.toLocaleString('fr-FR')} XOF</p>
+                    <p className="text-xs text-gray-400">(90%)</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">
-                    Payer Dr. {selectedEarning.doctor.firstName} {selectedEarning.doctor.lastName}
-                  </h2>
-                  <p className="text-xs text-gray-500">{selectedEarning.doctor.specialty}</p>
+              );
+            })()}
+
+            {/* Choix méthode principale */}
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Comment souhaitez-vous payer ?</p>
+              <div className="grid grid-cols-2 gap-3">
+                {PAYMENT_METHODS.map(m => {
+                  const Icon = m.icon;
+                  const active = payForm.paymentMethod === m.value;
+                  return (
+                    <button key={m.value} type="button"
+                      onClick={() => { setPayForm(f=>({...f,paymentMethod:m.value})); setSelectedOperator(''); }}
+                      className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all font-medium ${active?`border-green-500 ${m.bg} shadow-md`:`border-gray-200 hover:border-gray-300 hover:bg-gray-50`}`}>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${active?'bg-green-500 shadow-md':'bg-gray-100'}`}>
+                        <Icon className={`w-5 h-5 ${active?'text-white':m.color}`}/>
+                      </div>
+                      <div className="text-left">
+                        <p className={`text-sm font-semibold ${active?'text-green-700':'text-gray-700'}`}>{m.label}</p>
+                      </div>
+                      {active && <CheckCircle className="w-5 h-5 text-green-500 ml-auto"/>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Si mobile money → grille opérateurs avec logos exacts */}
+            {payForm.paymentMethod === 'mobile_money' && (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-green-500"/>
+                  Choisissez l'opérateur
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {MOBILE_OPERATORS.map(op => {
+                    const active = selectedOperator === op.id;
+                    return (
+                      <button key={op.id} type="button"
+                        onClick={() => setSelectedOperator(op.id)}
+                        className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all font-medium ${active?`border-green-500 bg-green-50 shadow-md`:'border-gray-200 hover:border-gray-300 bg-white'}`}>
+                        <div className={`w-10 h-10 ${op.color} rounded-xl flex items-center justify-center text-xl shadow-sm shrink-0 text-white font-bold`}>
+                          {op.emoji}
+                        </div>
+                        <div className="text-left min-w-0">
+                          <p className={`text-sm font-semibold truncate ${active?'text-green-700':'text-gray-800'}`}>{op.label}</p>
+                          <p className="text-xs text-gray-400 truncate">{op.country}</p>
+                        </div>
+                        {active && <CheckCircle className="w-4 h-4 text-green-500 ml-auto shrink-0"/>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <button onClick={() => setShowPayModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition">
-                <X className="w-5 h-5 text-gray-500"/>
-              </button>
-            </div>
+            )}
 
-            {/* ── Stepper ── */}
-            <div className="flex items-center gap-2 px-6 pt-4 pb-2">
-              {[{n:1,l:'Méthode de paiement'},{n:2,l:'Détails & confirmation'}].map(({n,l})=>(
-                <React.Fragment key={n}>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${payStep>=n?'bg-green-500 text-white shadow-md':'bg-gray-200 text-gray-500'}`}>{n}</div>
-                    <span className={`text-xs font-medium transition-colors ${payStep>=n?'text-green-600':'text-gray-400'}`}>{l}</span>
-                  </div>
-                  {n<2 && <div className={`flex-1 h-0.5 transition-all ${payStep>=2?'bg-green-400':'bg-gray-200'}`}/>}
-                </React.Fragment>
-              ))}
-            </div>
-
-            <div className="p-6 max-h-[65vh] overflow-y-auto">
-
-              {/* ══════ ÉTAPE 1 : Méthode de paiement ══════ */}
-              {payStep === 1 && (
-                <div className="space-y-5">
-                  {/* Résumé médecin */}
-                  <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                    {[
-                      {l:'Consultations impayées', v:selectedEarning.stats.unpaidConsultations, c:'text-gray-900'},
-                      {l:'Montant dû',             v:`${selectedEarning.stats.amountDue} XOF`,  c:'text-red-600'},
-                      {l:'Part médecin',           v:'90%',                                      c:'text-blue-600'},
-                    ].map(({l,v,c})=>(
-                      <div key={l} className="text-center"><p className="text-xs text-gray-500 leading-tight mb-1">{l}</p><p className={`text-xl font-bold ${c}`}>{v}</p></div>
-                    ))}
-                  </div>
-
-                  {/* Choix méthode principale */}
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700 mb-3">Comment souhaitez-vous payer ?</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {PAYMENT_METHODS.map(m => {
-                        const Icon = m.icon;
-                        const active = payForm.paymentMethod === m.value;
-                        return (
-                          <button key={m.value} type="button"
-                            onClick={() => { setPayForm(f=>({...f,paymentMethod:m.value})); setSelectedOperator(''); }}
-                            className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all font-medium ${active?`border-green-500 ${m.bg} shadow-md`:`border-gray-200 hover:border-gray-300 hover:bg-gray-50`}`}>
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${active?'bg-green-500 shadow-md':'bg-gray-100'}`}>
-                              <Icon className={`w-5 h-5 ${active?'text-white':m.color}`}/>
-                            </div>
-                            <div className="text-left">
-                              <p className={`text-sm font-semibold ${active?'text-green-700':'text-gray-700'}`}>{m.label}</p>
-                            </div>
-                            {active && <CheckCircle className="w-5 h-5 text-green-500 ml-auto"/>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Si mobile money → grille opérateurs */}
-                  {payForm.paymentMethod === 'mobile_money' && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                        <Smartphone className="w-4 h-4 text-green-500"/>
-                        Choisissez l'opérateur
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {MOBILE_OPERATORS.map(op => {
-                          const active = selectedOperator === op.id;
-                          return (
-                            <button key={op.id} type="button"
-                              onClick={() => setSelectedOperator(op.id)}
-                              className={`p-3 rounded-xl border-2 flex items-center gap-3 transition-all font-medium ${active?`border-green-500 bg-green-50 shadow-md`:'border-gray-200 hover:border-gray-300 bg-white'}`}>
-                              <div className={`w-10 h-10 ${op.color} rounded-xl flex items-center justify-center text-xl shadow-sm shrink-0`}>
-                                {op.emoji}
-                              </div>
-                              <div className="text-left min-w-0">
-                                <p className={`text-sm font-semibold truncate ${active?'text-green-700':'text-gray-800'}`}>{op.label}</p>
-                                <p className="text-xs text-gray-400 truncate">{op.country}</p>
-                              </div>
-                              {active && <CheckCircle className="w-4 h-4 text-green-500 ml-auto shrink-0"/>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bouton Suivant */}
-                  <button type="button"
-                    onClick={() => setPayStep(2)}
-                    disabled={payForm.paymentMethod==='mobile_money' && !selectedOperator}
-                    className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    Continuer →
-                    {payForm.paymentMethod==='mobile_money' && !selectedOperator && (
-                      <span className="text-xs text-green-200 ml-1">(choisir un opérateur)</span>
-                    )}
-                  </button>
-                </div>
+            {/* Bouton Suivant */}
+            <button type="button"
+              onClick={() => setPayStep(2)}
+              disabled={payForm.paymentMethod==='mobile_money' && !selectedOperator}
+              className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              Continuer →
+              {payForm.paymentMethod==='mobile_money' && !selectedOperator && (
+                <span className="text-xs text-green-200 ml-1">(choisir un opérateur)</span>
               )}
+            </button>
+          </div>
+        )}
 
-              {/* ══════ ÉTAPE 2 : Détails & confirmation ══════ */}
-              {payStep === 2 && (
-                <div className="space-y-4">
-
-                  {/* Récap méthode choisie */}
-                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
-                    {(() => {
-                      const method = PAYMENT_METHODS.find(m=>m.value===payForm.paymentMethod);
-                      const op = MOBILE_OPERATORS.find(o=>o.id===selectedOperator);
-                      const Icon = method?.icon || Smartphone;
-                      return <>
-                        <div className={`w-10 h-10 ${op?op.color:'bg-green-500'} rounded-xl flex items-center justify-center shadow-sm shrink-0`}>
-                          {op ? <span className="text-xl">{op.emoji}</span> : <Icon className="w-5 h-5 text-white"/>}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{op?.label || method?.label}</p>
-                          <p className="text-xs text-gray-500">{op?.country || 'Méthode sélectionnée'}</p>
-                        </div>
-                        <button type="button" onClick={()=>setPayStep(1)} className="ml-auto text-xs text-green-600 hover:underline font-medium">Changer</button>
-                      </>;
-                    })()}
+        {/* ══════ ÉTAPE 2 : Détails & confirmation ══════ */}
+        {payStep === 2 && (
+          <div className="space-y-4">
+            {/* Récap méthode choisie */}
+            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+              {(() => {
+                const method = PAYMENT_METHODS.find(m=>m.value===payForm.paymentMethod);
+                const op = MOBILE_OPERATORS.find(o=>o.id===selectedOperator);
+                const Icon = method?.icon || Smartphone;
+                return <>
+                  <div className={`w-10 h-10 ${op?op.color:'bg-green-500'} rounded-xl flex items-center justify-center shadow-sm shrink-0 text-white font-bold`}>
+                    {op ? <span className="text-xl">{op.emoji}</span> : <Icon className="w-5 h-5 text-white"/>}
                   </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{op?.label || method?.label}</p>
+                    <p className="text-xs text-gray-500">{op?.country || 'Méthode sélectionnée'}</p>
+                  </div>
+                  <button type="button" onClick={()=>setPayStep(1)} className="ml-auto text-xs text-green-600 hover:underline font-medium">Changer</button>
+                </>;
+              })()}
+            </div>
 
-                  {/* Montant + devise + période */}
+            {/* Montant pré-rempli avec le bon calcul */}
+            {(() => {
+              const consultations = selectedEarning.stats.unpaidConsultations || 0;
+              const montantTotal = consultations * 45000;
+              const partMedecin = montantTotal * 0.9;
+              
+              return (
+                <>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">💰 Montant *</label>
-                      <input type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border-2 border-green-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 bg-green-50 text-gray-800 shadow-sm" placeholder="0"/>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">💰 Montant à payer *</label>
+                      <input 
+                        type="number" 
+                        value={partMedecin} 
+                        onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}
+                        className="w-full px-3 py-2.5 border-2 border-green-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 bg-green-50 text-gray-800 shadow-sm" 
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{consultations} consultation(s) à 45 000 XOF → {montantTotal.toLocaleString('fr-FR')} XOF (90% = {partMedecin.toLocaleString('fr-FR')} XOF)</p>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1.5">Devise</label>
@@ -1441,93 +1499,93 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1.5">🩺 Nb consultations</label>
-                      <input type="number" value={payForm.consultationsCount} onChange={e=>setPayForm(f=>({...f,consultationsCount:e.target.value}))}
-                        className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
+                      <input type="number" value={consultations} readOnly
+                        className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 shadow-sm cursor-not-allowed"/>
                     </div>
                   </div>
+                </>
+              );
+            })()}
 
-                  {/* Champs spécifiques mobile money */}
-                  {payForm.paymentMethod === 'mobile_money' && (
-                    <div className="space-y-2.5 p-4 bg-green-50 rounded-xl border-2 border-green-300 shadow-sm">
-                      <p className="text-xs font-bold text-green-800 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
-                      <div>
-                        <label className="block text-xs font-semibold text-green-700 mb-1">📱 Numéro de téléphone *</label>
-                        <input placeholder="+228 XX XX XX XX" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
-                          className="w-full px-3 py-2.5 border-2 border-green-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"
-                          type="tel"/>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-green-700 mb-1">🔖 Référence transaction (optionnel)</label>
-                        <input placeholder="Ex: TXN-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                          className="w-full px-3 py-2.5 border-2 border-green-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Champs spécifiques virement */}
-                  {payForm.paymentMethod === 'bank_transfer' && (
-                    <div className="space-y-2.5 p-4 bg-blue-50 rounded-xl border-2 border-blue-300 shadow-sm">
-                      <p className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
-                      {[
-                        {pl:'🏦 Nom de la banque *', k:'bankName'},
-                        {pl:'🔢 Numéro de compte *', k:'accountNumber'},
-                        {pl:'🌍 IBAN (optionnel)',    k:'iban'}
-                      ].map(({pl,k})=>(
-                        <div key={k}>
-                          <label className="block text-xs font-semibold text-blue-700 mb-1">{pl}</label>
-                          <input placeholder={pl.replace(/^[^ ]+ /,'')} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
-                            className="w-full px-3 py-2.5 border-2 border-blue-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 shadow-sm"/>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Espèces / Chèque */}
-                  {(payForm.paymentMethod==='cash'||payForm.paymentMethod==='check') && (
-                    <div className="space-y-2.5 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-300 shadow-sm">
-                      <p className="text-xs font-bold text-yellow-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <Banknote className="w-3.5 h-3.5"/>{payForm.paymentMethod==='cash'?'Paiement espèces':'Paiement par chèque'}
-                      </p>
-                      <div>
-                        <label className="block text-xs font-semibold text-yellow-700 mb-1">🔖 Numéro de référence / reçu</label>
-                        <input placeholder="Ex: REC-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
-                          className="w-full px-3 py-2.5 border-2 border-yellow-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-gray-800 shadow-sm"/>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Notes */}
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">📝 Notes (optionnel)</label>
-                    <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
-                      placeholder="Observations, justificatifs…"
-                      className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm resize-none"/>
-                  </div>
-
-                  {/* Boutons */}
-                  <div className="flex gap-3 pt-1">
-                    <button type="button" onClick={()=>setPayStep(1)}
-                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm flex items-center justify-center gap-1">
-                      ← Retour
-                    </button>
-                    <button type="button" onClick={submitPayment} disabled={payLoading || !payForm.amount || parseFloat(payForm.amount)<=0}
-                      className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 text-sm">
-                      {payLoading
-                        ? <Loader2 className="w-5 h-5 animate-spin"/>
-                        : <><Send className="w-4 h-4"/> Confirmer le paiement</>
-                      }
-                    </button>
-                  </div>
+            {/* Champs spécifiques mobile money */}
+            {payForm.paymentMethod === 'mobile_money' && (
+              <div className="space-y-2.5 p-4 bg-green-50 rounded-xl border-2 border-green-300 shadow-sm">
+                <p className="text-xs font-bold text-green-800 uppercase tracking-wider flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5"/>Informations Mobile Money</p>
+                <div>
+                  <label className="block text-xs font-semibold text-green-700 mb-1">📱 Numéro de téléphone *</label>
+                  <input placeholder="+228 XX XX XX XX" value={payForm.phoneNumber} onChange={e=>setPayForm(f=>({...f,phoneNumber:e.target.value}))}
+                    className="w-full px-3 py-2.5 border-2 border-green-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"
+                    type="tel"/>
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-semibold text-green-700 mb-1">🔖 Référence transaction (optionnel)</label>
+                  <input placeholder="Ex: TXN-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                    className="w-full px-3 py-2.5 border-2 border-green-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm"/>
+                </div>
+              </div>
+            )}
 
+            {/* Champs spécifiques virement */}
+            {payForm.paymentMethod === 'bank_transfer' && (
+              <div className="space-y-2.5 p-4 bg-blue-50 rounded-xl border-2 border-blue-300 shadow-sm">
+                <p className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/>Informations bancaires</p>
+                {[
+                  {pl:'🏦 Nom de la banque *', k:'bankName'},
+                  {pl:'🔢 Numéro de compte *', k:'accountNumber'},
+                  {pl:'🌍 IBAN (optionnel)',    k:'iban'}
+                ].map(({pl,k})=>(
+                  <div key={k}>
+                    <label className="block text-xs font-semibold text-blue-700 mb-1">{pl}</label>
+                    <input placeholder={pl.replace(/^[^ ]+ /,'')} value={(payForm as any)[k]} onChange={e=>setPayForm(f=>({...f,[k]:e.target.value}))}
+                      className="w-full px-3 py-2.5 border-2 border-blue-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 shadow-sm"/>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Espèces / Chèque */}
+            {(payForm.paymentMethod==='cash'||payForm.paymentMethod==='check') && (
+              <div className="space-y-2.5 p-4 bg-yellow-50 rounded-xl border-2 border-yellow-300 shadow-sm">
+                <p className="text-xs font-bold text-yellow-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Banknote className="w-3.5 h-3.5"/>{payForm.paymentMethod==='cash'?'Paiement espèces':'Paiement par chèque'}
+                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-yellow-700 mb-1">🔖 Numéro de référence / reçu</label>
+                  <input placeholder="Ex: REC-2026-XXXXX" value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}
+                    className="w-full px-3 py-2.5 border-2 border-yellow-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-gray-800 shadow-sm"/>
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5">📝 Notes (optionnel)</label>
+              <textarea rows={2} value={payForm.notes} onChange={e=>setPayForm(f=>({...f,notes:e.target.value}))}
+                placeholder="Observations, justificatifs…"
+                className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-800 shadow-sm resize-none"/>
+            </div>
+
+            {/* Boutons */}
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={()=>setPayStep(1)}
+                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm flex items-center justify-center gap-1">
+                ← Retour
+              </button>
+              <button type="button" onClick={submitPayment} disabled={payLoading}
+                className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 text-sm">
+                {payLoading
+                  ? <Loader2 className="w-5 h-5 animate-spin"/>
+                  : <><Send className="w-4 h-4"/> Confirmer le paiement</>
+                }
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  </div>
+)}
 
-
-      {/* ══════════════ MODAL PRESCRIPTION ══════════════════════════════════ */}
       {selectedPresc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={()=>setSelectedPresc(null)}>
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
@@ -1584,7 +1642,6 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ══════════════ PORTAIL DROPDOWN NOTIFICATIONS ══════════════════════ */}
       {showNotifDropdown && createPortal(
         <>
           <div
@@ -1610,7 +1667,6 @@ const AdminDashboard: React.FC = () => {
               }
             `}</style>
 
-            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-blue-600"/>
@@ -1626,7 +1682,6 @@ const AdminDashboard: React.FC = () => {
               </button>
             </div>
 
-            {/* Corps */}
             <div className="max-h-72 overflow-y-auto">
               {pendingPayCount === 0 ? (
                 <div className="py-10 text-center">
@@ -1662,7 +1717,6 @@ const AdminDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Footer */}
             {pendingPayCount > 0 && (
               <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
                 <button
@@ -1678,7 +1732,6 @@ const AdminDashboard: React.FC = () => {
         document.body
       )}
 
-      {/* ══════════════ MODAL DÉCONNEXION ════════════════════════════════════ */}
       {showLogoutModal && createPortal(
         <div
           className="flex items-center justify-center"
@@ -1688,7 +1741,6 @@ const AdminDashboard: React.FC = () => {
             className="bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-sm mx-4"
             style={{ animation: 'adminNotifIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards' }}
           >
-            {/* Icône */}
             <div className="flex flex-col items-center pt-8 pb-4 px-6">
               <div className="w-16 h-16 bg-gradient-to-br from-red-50 to-rose-100 border-2 border-red-200 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
                 <LogOut className="w-8 h-8 text-red-500"/>
@@ -1704,7 +1756,6 @@ const AdminDashboard: React.FC = () => {
 
             <div className="border-t border-gray-100 mx-6"/>
 
-            {/* Boutons */}
             <div className="flex gap-3 p-5">
               <button
                 onClick={() => setShowLogoutModal(false)}
@@ -1723,7 +1774,6 @@ const AdminDashboard: React.FC = () => {
         </div>,
         document.body
       )}
-
     </div>
   );
 };
