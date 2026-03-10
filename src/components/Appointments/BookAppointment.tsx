@@ -23,11 +23,10 @@ const BookAppointment: React.FC = () => {
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [step, setStep] = useState(1)
 
-  // Générer les créneaux disponibles (par défaut)
   const generateDefaultSlots = (): string[] => {
     const slots = []
     for (let hour = 8; hour <= 17; hour++) {
-      if (hour !== 12) { // Pause déjeuner
+      if (hour !== 12) {
         slots.push(`${hour.toString().padStart(2, '0')}:00`)
         slots.push(`${hour.toString().padStart(2, '0')}:30`)
       }
@@ -63,11 +62,9 @@ const BookAppointment: React.FC = () => {
     setSelectedSlot(null)
     
     try {
-      // 1. Récupérer les créneaux déjà réservés pour ce médecin à cette date
       const booked = await appointmentService.getDoctorBookedSlots(selectedDoctor.id, selectedDate)
       setBookedSlots(booked)
       
-      // 2. Récupérer les créneaux disponibles (ou utiliser ceux par défaut)
       let slots: string[]
       try {
         slots = await appointmentService.getDoctorAvailableSlots(selectedDoctor.id, selectedDate)
@@ -76,13 +73,11 @@ const BookAppointment: React.FC = () => {
         slots = generateDefaultSlots()
       }
       
-      // 3. Filtrer pour enlever les créneaux déjà réservés
       const trulyAvailableSlots = slots.filter(slot => !booked.includes(slot))
       setAvailableSlots(trulyAvailableSlots)
       
     } catch (error) {
       console.error('Erreur chargement créneaux:', error)
-      // En cas d'erreur, on génère des créneaux par défaut non réservés
       const defaultSlots = generateDefaultSlots()
       setAvailableSlots(defaultSlots)
       setBookedSlots([])
@@ -102,10 +97,9 @@ const BookAppointment: React.FC = () => {
   }
 
   const handleSlotSelect = (slot: string) => {
-    // Vérifier une dernière fois que le créneau n'est pas réservé
     if (bookedSlots.includes(slot)) {
       showNotification('Ce créneau vient d\'être pris par un autre patient', 'error')
-      loadAvailableSlots() // Recharger les créneaux
+      loadAvailableSlots()
       return
     }
     setSelectedSlot(slot)
@@ -116,7 +110,6 @@ const BookAppointment: React.FC = () => {
     e.preventDefault()
     if (!selectedDoctor || !selectedSlot || !selectedDate) return
 
-    // Vérification finale avant soumission
     if (bookedSlots.includes(selectedSlot)) {
       showNotification('Ce créneau n\'est plus disponible', 'error')
       loadAvailableSlots()
@@ -140,12 +133,11 @@ const BookAppointment: React.FC = () => {
     } catch (error: any) {
       console.error('Erreur création rendez-vous:', error)
       
-      // Gérer spécifiquement l'erreur de créneau déjà pris
       if (error.response?.data?.message?.includes('already booked') || 
           error.response?.data?.message?.includes('déjà réservé')) {
         showNotification('Ce créneau vient d\'être pris. Veuillez en choisir un autre.', 'error')
-        loadAvailableSlots() // Recharger les créneaux disponibles
-        setStep(2) // Retourner à l'étape de sélection
+        loadAvailableSlots()
+        setStep(2)
       } else {
         showNotification('Erreur lors de la prise de rendez-vous', 'error')
       }
@@ -161,7 +153,6 @@ const BookAppointment: React.FC = () => {
     for (let i = 0; i < 30; i++) {
       const date = new Date(today)
       date.setDate(today.getDate() + i)
-      // Exclure dimanche (0) et samedi (6)
       if (date.getDay() !== 0 && date.getDay() !== 6) {
         dates.push(date.toISOString().split('T')[0])
       }
@@ -169,19 +160,20 @@ const BookAppointment: React.FC = () => {
     return dates
   }
 
-  // Vérifier si un créneau est disponible
   const isSlotAvailable = (slot: string): boolean => {
     return availableSlots.includes(slot) && !bookedSlots.includes(slot)
   }
 
-  // Compter le nombre de créneaux disponibles
   const getAvailableSlotsCount = (): number => {
     return availableSlots.filter(slot => !bookedSlots.includes(slot)).length
   }
 
+  const formatPrice = (price: number | undefined): string => {
+    return price ? new Intl.NumberFormat('fr-FR').format(price) : '45 000'
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 relative overflow-hidden">
-      {/* Fond animé */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-cyan-500/20 to-transparent rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute top-1/3 -left-40 w-96 h-96 bg-gradient-to-br from-purple-500/15 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
@@ -191,7 +183,6 @@ const BookAppointment: React.FC = () => {
       <div className="fixed inset-0 bg-[linear-gradient(rgba(100,200,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(100,200,255,0.03)_1px,transparent_1px)] bg-[size:50px_50px] pointer-events-none"></div>
 
       <div className="relative z-10">
-        {/* Header */}
         <header className="sticky top-0 z-50 backdrop-blur-2xl bg-gradient-to-b from-white/10 to-white/5 border-b border-white/10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-20">
@@ -216,7 +207,6 @@ const BookAppointment: React.FC = () => {
         </header>
 
         <div className="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-          {/* Étapes animées */}
           <div className="mb-16">
             <div className="flex items-center justify-between relative">
               <div className="absolute inset-x-0 top-1/2 h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-y-1/2"></div>
@@ -246,7 +236,6 @@ const BookAppointment: React.FC = () => {
             </div>
           </div>
 
-          {/* Étape 1: Choix du médecin */}
           {step === 1 && (
             <div className="space-y-8">
               <div>
@@ -285,7 +274,7 @@ const BookAppointment: React.FC = () => {
                           <div className="space-y-2 text-sm">
                             <div className="flex items-center gap-2 text-white/70">
                               <span className="w-1 h-1 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full"></span>
-                              <span><strong>{doctor.consultationPrice || 50}€</strong> la consultation</span>
+                              <span><strong>{formatPrice(doctor.consultationPrice)} XOF</strong> la consultation</span>
                             </div>
                           </div>
                         </div>
@@ -299,7 +288,6 @@ const BookAppointment: React.FC = () => {
             </div>
           )}
 
-          {/* Étape 2: Choix de la date et heure */}
           {step === 2 && selectedDoctor && (
             <div className="space-y-8">
               <div className="flex items-start justify-between">
@@ -324,7 +312,6 @@ const BookAppointment: React.FC = () => {
                 </button>
               </div>
 
-              {/* Résumé du médecin sélectionné */}
               <div className="relative rounded-2xl overflow-hidden p-8 border border-white/10">
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-purple-600/10"></div>
                 <div className="relative flex items-center gap-6">
@@ -338,7 +325,6 @@ const BookAppointment: React.FC = () => {
                 </div>
               </div>
 
-              {/* Sélection des dates */}
               <div>
                 <label className="block text-lg font-bold text-white mb-6 flex items-center gap-2">
                   <Calendar className="w-6 h-6 text-cyan-400" />
@@ -383,7 +369,6 @@ const BookAppointment: React.FC = () => {
                 </div>
               </div>
 
-              {/* Créneaux horaires */}
               {selectedDate && (
                 <div>
                   <div className="flex items-center justify-between mb-6">
@@ -410,7 +395,6 @@ const BookAppointment: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      {/* Créneaux du matin */}
                       <div className="mb-6">
                         <h4 className="text-white/60 text-sm font-semibold mb-3">MATIN</h4>
                         <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
@@ -443,7 +427,6 @@ const BookAppointment: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Créneaux de l'après-midi */}
                       <div>
                         <h4 className="text-white/60 text-sm font-semibold mb-3">APRÈS-MIDI</h4>
                         <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
@@ -482,7 +465,6 @@ const BookAppointment: React.FC = () => {
             </div>
           )}
 
-          {/* Étape 3: Confirmation */}
           {step === 3 && selectedDoctor && selectedSlot && selectedDate && (
             <div className="space-y-8">
               <h2 className="text-4xl font-black">
@@ -491,7 +473,6 @@ const BookAppointment: React.FC = () => {
                 </span>
               </h2>
 
-              {/* Récapitulatif */}
               <div className="relative rounded-2xl overflow-hidden border border-white/10">
                 <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-white/5"></div>
                 <div className="relative p-10 space-y-6">
@@ -536,13 +517,12 @@ const BookAppointment: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <p className="text-white/60">Honoraires de consultation</p>
                     <p className="text-2xl font-black bg-gradient-to-r from-cyan-300 to-purple-300 bg-clip-text text-transparent">
-                      {selectedDoctor.consultationPrice || 50}€
+                      {formatPrice(selectedDoctor.consultationPrice)} XOF
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Formulaire */}
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="block text-white font-bold mb-3">Type de consultation</label>
