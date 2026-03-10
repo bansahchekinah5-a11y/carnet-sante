@@ -555,8 +555,8 @@ const AdminDashboard: React.FC = () => {
                         rows:[{l:'Médecins',v:stats.users.doctors},{l:'Patients',v:stats.users.patients},{l:'Actifs',v:stats.users.active},{l:'Inactifs',v:stats.users.inactive}] },
                       { title:'Rendez-vous', value:aptStats.total, icon:Calendar, color:'from-orange-500 to-rose-500',
                         rows:[{l:'En attente',v:aptStats.pending},{l:'Confirmés',v:aptStats.confirmed},{l:'Terminés',v:aptStats.completed},{l:"Aujourd'hui",v:aptStats.today}] },
-                      { title:'Revenus', value:`${stats.financial.totalRevenue}€`, icon:DollarSign, color:'from-emerald-500 to-teal-600',
-                        rows:[{l:'Commission',v:`${stats.financial.totalCommission}€`},{l:'En attente',v:`${stats.financial.pendingPayments}€`},{l:'Encaissé',v:`${stats.financial.completedPayments}€`}] },
+                      { title:'Revenus', value:`${stats.financial.totalRevenue} XOF`, icon:DollarSign, color:'from-emerald-500 to-teal-600',
+                        rows:[{l:'Commission',v:`${stats.financial.totalCommission} XOF`},{l:'En attente',v:`${stats.financial.pendingPayments} XOF`},{l:'Encaissé',v:`${stats.financial.completedPayments} XOF`}] },
                       { title:'Calendriers', value:calendars.length, icon:Calendar, color:'from-violet-500 to-purple-600',
                         rows:[{l:'Confirmés',v:calendars.filter(c=>c.confirmed).length},{l:'En attente',v:calendars.filter(c=>!c.confirmed).length}] },
                     ].map((c,i) => {
@@ -710,9 +710,9 @@ const AdminDashboard: React.FC = () => {
                   <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2"><DollarSign className="w-5 h-5 text-green-500"/>Performance financière</h3>
                     <div className="space-y-3">
-                      <div className="bg-green-50 border border-green-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Revenus totaux</p><p className="text-2xl font-bold text-green-600">{stats.financial.totalRevenue} €</p></div>
-                      <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Commission (10%)</p><p className="text-xl font-bold text-purple-600">{stats.financial.totalCommission} €</p></div>
-                      <div className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg"><span className="text-sm text-gray-600">En attente</span><span className="font-semibold text-yellow-600 text-sm">{stats.financial.pendingPayments} €</span></div>
+                      <div className="bg-green-50 border border-green-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Revenus totaux</p><p className="text-2xl font-bold text-green-600">{stats.financial.totalRevenue} XOF</p></div>
+                      <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Commission (10%)</p><p className="text-xl font-bold text-purple-600">{stats.financial.totalCommission} XOF</p></div>
+                      <div className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg"><span className="text-sm text-gray-600">En attente</span><span className="font-semibold text-yellow-600 text-sm">{stats.financial.pendingPayments} XOF</span></div>
                     </div>
                   </div>
                 </div>
@@ -1187,10 +1187,10 @@ const AdminDashboard: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-green-500"/>Revenus globaux</h3>
               <div className="space-y-3">
                 {[
-                  {l:'Revenus totaux',     v:`${stats.financial.totalRevenue} €`,      c:'text-green-600', bg:'bg-green-50 border-green-200',   big:true},
-                  {l:'Commission (10%)',   v:`${stats.financial.totalCommission} €`,   c:'text-purple-600',bg:'bg-purple-50 border-purple-200'       },
-                  {l:'Paiements en attente',v:`${stats.financial.pendingPayments} €`,  c:'text-yellow-600',bg:'bg-yellow-50 border-yellow-200'       },
-                  {l:'Paiements complétés',v:`${stats.financial.completedPayments} €`, c:'text-blue-600',  bg:'bg-blue-50 border-blue-200'           },
+                  {l:'Revenus totaux',     v:`${stats.financial.totalRevenue} XOF`,      c:'text-green-600', bg:'bg-green-50 border-green-200',   big:true},
+                  {l:'Commission (10%)',   v:`${stats.financial.totalCommission} XOF`,   c:'text-purple-600',bg:'bg-purple-50 border-purple-200'       },
+                  {l:'Paiements en attente',v:`${stats.financial.pendingPayments} XOF`,  c:'text-yellow-600',bg:'bg-yellow-50 border-yellow-200'       },
+                  {l:'Paiements complétés',v:`${stats.financial.completedPayments} XOF`, c:'text-blue-600',  bg:'bg-blue-50 border-blue-200'           },
                 ].map(({l,v,c,bg,big})=>(
                   <div key={l} className={`flex justify-between items-center p-4 rounded-xl border ${bg}`}>
                     <span className="text-gray-600 text-sm">{l}</span>
