@@ -1043,10 +1043,9 @@ const AdminDashboard: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {fEarn.map(e => {
-                    // Calculs basés sur 45 000 XOF par consultation
                     const consultations = e.stats.completedConsultations || 0;
                     const montantTotal = consultations * 45000;
-                    const partMedecin = montantTotal * 0.9; // 90% du montant total
+                    const partMedecin = montantTotal * 0.9;
                     const verse = e.stats.totalPaid || 0;
                     const restantDu = Math.max(0, partMedecin - verse);
                     
@@ -1142,97 +1141,101 @@ const AdminDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
 
-            <div className="border-t border-gray-200 bg-gray-50 p-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-gray-500"/>
-                Historique des derniers paiements
-              </h4>
-              <div className="space-y-2">
-                {fEarn.filter(e => e.paymentHistory?.length > 0).slice(0, 3).map(e => {
-                  const consultations = e.stats.completedConsultations || 0;
-                  const montantTotal = consultations * 45000;
-                  const partMedecin = montantTotal * 0.9;
+        {/* HISTORIQUE DES PAIEMENTS - STYLE COMME ACTIVITÉ RÉCENTE */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Derniers paiements (comme activité récente) */}
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100">
+              <Receipt className="w-5 h-5 text-green-600"/> Derniers paiements
+            </h3>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {payments.length === 0 ? (
+                <div className="text-center py-10">
+                  <Receipt className="w-10 h-10 text-gray-200 mx-auto mb-2"/>
+                  <p className="text-sm text-gray-400">Aucun paiement récent</p>
+                </div>
+              ) : (
+                payments.slice(0, 6).map((p, idx) => {
+                  const method = PAYMENT_METHODS.find(m => m.value === p.paymentMethod);
+                  const date = p.createdAt ? new Date(p.createdAt) : new Date();
+                  const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+                  
                   return (
-                    <div key={e.doctor.id} className="bg-white rounded-lg border border-gray-200 p-3">
-                      <p className="text-sm font-medium text-gray-800 mb-2">Dr. {e.doctor.lastName} - {consultations} consultation(s) · {partMedecin.toLocaleString('fr-FR')} XOF dus</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(e.paymentHistory || []).slice(0, 3).map((p: any, i: number) => (
-                          <span key={i} className="px-2.5 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs flex items-center gap-1">
-                            <CheckCircle className="w-3 h-3"/>
-                            {p.amount?.toLocaleString('fr-FR')} XOF — {p.period || fmtDate(p.processedAt)}
-                          </span>
-                        ))}
-                        {(e.paymentHistory || []).length > 3 && (
-                          <span className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-gray-500 rounded-full text-xs">
-                            +{(e.paymentHistory || []).length - 3} autres
-                          </span>
+                    <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-green-200 hover:bg-green-50/30 transition-all">
+                      <div className={`w-9 h-9 ${method?.bg || 'bg-gray-100'} rounded-xl flex items-center justify-center shrink-0 shadow-sm`}>
+                        {method?.icon ? (
+                          <method.icon className={`w-5 h-5 ${method?.color || 'text-gray-600'}`} />
+                        ) : (
+                          <DollarSign className="w-5 h-5 text-gray-600" />
                         )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {p.amount?.toLocaleString('fr-FR')} {p.currency} • {p.doctor?.firstName} {p.doctor?.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {p.period || '—'} • {p.consultationsCount || 0} consultation(s)
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-xs text-gray-400 font-medium">{dateStr}</span>
+                        <Badge status={p.status} />
                       </div>
                     </div>
                   );
-                })}
-                {fEarn.filter(e => e.paymentHistory?.length > 0).length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-4">Aucun historique de paiement</p>
-                )}
-              </div>
+                })
+              )}
             </div>
           </div>
-        )}
 
-        {payments.length > 0 && (
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-gray-500"/>
-              <h3 className="font-semibold text-gray-900">Historique complet des paiements</h3>
-              <span className="ml-auto text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{payments.length}</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[600px]">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Médecin</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Montant</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Consult.</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Méthode</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Période</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {payments.map(p => {
-                    const method = PAYMENT_METHODS.find(m=>m.value===p.paymentMethod);
-                    const MI = method?.icon || Banknote;
-                    return (
-                      <tr key={p.id} className="hover:bg-gray-50 transition">
-                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{fmtDate(p.createdAt)}</td>
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-medium text-gray-900">Dr. {p.doctor?.firstName} {p.doctor?.lastName}</p>
-                          <p className="text-xs text-gray-500">{p.doctor?.specialty}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <p className="text-sm font-bold text-green-600">{p.amount?.toLocaleString('fr-FR')} {p.currency}</p>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="text-sm text-gray-600">{p.consultationsCount || 0}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`flex items-center gap-1.5 text-sm ${method?.color||'text-gray-600'}`}>
-                            <MI className="w-4 h-4"/>
-                            {method?.label || p.paymentMethod}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{p.period || '—'}</td>
-                        <td className="px-4 py-3 text-center"><Badge status={p.status}/></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          {/* Historique complet des paiements (style similaire) */}
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2 pb-3 border-b border-gray-100">
+              <Receipt className="w-5 h-5 text-purple-600"/> Historique complet
+            </h3>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {payments.length === 0 ? (
+                <div className="text-center py-10">
+                  <Receipt className="w-10 h-10 text-gray-200 mx-auto mb-2"/>
+                  <p className="text-sm text-gray-400">Aucun historique de paiement</p>
+                </div>
+              ) : (
+                payments.map((p, idx) => {
+                  const method = PAYMENT_METHODS.find(m => m.value === p.paymentMethod);
+                  const date = p.createdAt ? new Date(p.createdAt) : new Date();
+                  const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+                  
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all">
+                      <div className={`w-9 h-9 ${method?.bg || 'bg-purple-100'} rounded-xl flex items-center justify-center shrink-0 shadow-sm`}>
+                        {method?.icon ? (
+                          <method.icon className={`w-5 h-5 ${method?.color || 'text-purple-600'}`} />
+                        ) : (
+                          <DollarSign className="w-5 h-5 text-purple-600" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          Dr. {p.doctor?.firstName} {p.doctor?.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {p.amount?.toLocaleString('fr-FR')} {p.currency} • {p.period || '—'} • {p.consultationsCount || 0} consult.
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-xs text-gray-400 font-medium">{dateStr}</span>
+                        <Badge status={p.status} />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
-        )}
+        </div>
       </>
     )}
   </div>
