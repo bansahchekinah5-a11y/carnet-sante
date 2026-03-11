@@ -40,7 +40,6 @@ const PatientDashboard: React.FC = () => {
   const { user, logout, updateProfilePicture } = useAuth();
   const { showNotification } = useNotification();
 
-  // États pour l'upload de photo
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,15 +74,12 @@ const PatientDashboard: React.FC = () => {
     conditions: 1,
   };
 
-  // Horloge temps réel – recalcule les statuts toutes les 30s
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
 
-  // Calcule le statut RÉEL à partir de la date/heure du RDV
-  // (le statut en BDD peut être en retard sur la réalité)
   const getComputedStatus = (dbStatus: string, appointmentDate: string, duration: number = 30): string => {
     if (['cancelled', 'no_show'].includes(dbStatus)) return dbStatus;
     const start = new Date(appointmentDate).getTime();
@@ -94,18 +90,13 @@ const PatientDashboard: React.FC = () => {
     return dbStatus;
   };
 
-  const HEURE_OUVERTURE = 8;   // 08h00
-  const HEURE_FERMETURE = 19;  // 19h00
-
   const generateDates = () => {
     const dates = [];
-    const now   = new Date();
-    // Si 19h ou plus → plus aucun créneau disponible aujourd'hui → on commence demain
-    const startOffset = now.getHours() >= HEURE_FERMETURE ? 1 : 0;
-    for (let i = startOffset; dates.length < 30; i++) {
-      const date = new Date(now);
-      date.setDate(now.getDate() + i);
-      if (date.getDay() !== 0) { // pas de dimanche
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      if (date.getDay() !== 0) {
         dates.push(date.toISOString().split('T')[0]);
       }
     }
@@ -123,45 +114,21 @@ const PatientDashboard: React.FC = () => {
     setIsLoadingSlots(true);
     setAvailableSlots([]);
     setSelectedTime('');
-
-    const today   = new Date().toISOString().split('T')[0];
-    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
-    // Pour aujourd'hui : créneau doit être > heure actuelle + 30 min ET avant 19h
-    // Pour les autres jours : tous les créneaux entre 8h et 19h
-    const filterSlots = (slots: string[]) => {
-      return slots.filter((slot: string) => {
-        const [h, m] = slot.split(':').map(Number);
-        const slotMins = h * 60 + m;
-        const inBusinessHours = h >= HEURE_OUVERTURE && h < HEURE_FERMETURE;
-        if (!inBusinessHours) return false;
-        if (selectedDate === today) {
-          return slotMins > nowMins + 30; // +30 min de délai minimum
-        }
-        return true;
-      });
-    };
-
     try {
       const slots = await appointmentService.getDoctorAvailableSlots(selectedDoctor.id, selectedDate);
-      setAvailableSlots(filterSlots(slots));
+      setAvailableSlots(slots);
     } catch (error) {
       console.error('Erreur chargement créneaux:', error);
-      // Créneaux de secours : toutes les heures de 8h à 18h
-      const fallback = Array.from({ length: HEURE_FERMETURE - HEURE_OUVERTURE }, (_, i) =>
-        `${String(HEURE_OUVERTURE + i).padStart(2, '0')}:00`
-      );
-      setAvailableSlots(filterSlots(fallback));
+      setAvailableSlots(['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']);
     } finally {
       setIsLoadingSlots(false);
     }
   };
 
-  // ✅ Fonction pour uploader la photo de profil
   const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validation
     if (!file.type.startsWith('image/')) {
       showNotification('Veuillez sélectionner une image', 'error');
       return;
@@ -198,7 +165,6 @@ const PatientDashboard: React.FC = () => {
       }
 
       if (data.success) {
-        // ✅ Mise à jour avec le nouveau token
         updateProfilePicture(data.data.profilePicture, data.data.token);
         showNotification('✅ Photo de profil mise à jour', 'success');
       }
@@ -253,7 +219,6 @@ const PatientDashboard: React.FC = () => {
         };
       });
 
-      // Garde tous les RDV des 30 derniers jours + les futurs (sauf annulés)
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const upcoming = transformedAppointments.filter(apt => {
         try {
@@ -266,7 +231,6 @@ const PatientDashboard: React.FC = () => {
           return false;
         }
       });
-      // Tri : plus récent en premier
       upcoming.sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime());
 
       console.log('✅ Rendez-vous chargés:', upcoming.length);
@@ -299,7 +263,7 @@ const PatientDashboard: React.FC = () => {
           specialty: d.specialty || 'Non spécifié',
           available: d.isActive !== false,
           availableSlots: d.availableSlots || ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
-          consultationPrice: d.consultationPrice || 50
+          consultationPrice: 45000
         }));
 
         setDoctors(fetchedDoctors);
@@ -316,7 +280,7 @@ const PatientDashboard: React.FC = () => {
             specialty: 'Cardiologie',
             available: true,
             availableSlots: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
-            consultationPrice: 60
+            consultationPrice: 45000
           },
           {
             id: '2',
@@ -325,7 +289,7 @@ const PatientDashboard: React.FC = () => {
             specialty: 'Dermatologie',
             available: true,
             availableSlots: ['10:30', '14:00', '16:00'],
-            consultationPrice: 55
+            consultationPrice: 45000
           },
           {
             id: '3',
@@ -334,7 +298,7 @@ const PatientDashboard: React.FC = () => {
             specialty: 'Neurologie',
             available: false,
             availableSlots: [],
-            consultationPrice: 70
+            consultationPrice: 45000
           },
         ];
         setDoctors(mockDoctors);
@@ -468,6 +432,10 @@ const PatientDashboard: React.FC = () => {
     setFormData({ reason: '', type: 'in_person', symptoms: '' });
   };
 
+  const formatPrice = (price: number | undefined): string => {
+    return '45 000';
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -504,10 +472,8 @@ const PatientDashboard: React.FC = () => {
               </nav>
             </div>
 
-            {/* ✅ SECTION MODIFIÉE - Photo de profil et infos utilisateur avec upload */}
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3 relative group">
-                {/* Photo de profil avec upload */}
                 <div className="relative">
                   <div
                     onClick={triggerFileInput}
@@ -533,7 +499,6 @@ const PatientDashboard: React.FC = () => {
                       </span>
                     )}
 
-                    {/* Overlay de chargement */}
                     {uploading && (
                       <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -541,7 +506,6 @@ const PatientDashboard: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Bouton caméra pour upload */}
                   <button
                     onClick={triggerFileInput}
                     className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-1.5 shadow-lg hover:bg-blue-600 transition"
@@ -551,7 +515,6 @@ const PatientDashboard: React.FC = () => {
                     <Camera size={12} className="text-white" />
                   </button>
 
-                  {/* Input file caché */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -562,7 +525,6 @@ const PatientDashboard: React.FC = () => {
                   />
                 </div>
 
-                {/* Infos utilisateur */}
                 <div className="hidden sm:block">
                   <p className="text-sm font-medium text-white">
                     {user?.firstName} {user?.lastName}
@@ -583,7 +545,6 @@ const PatientDashboard: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* ✅ SECTION MODIFIÉE - Message de bienvenue avec photo de profil */}
         <div className="mb-12 animate-slide-in flex items-center gap-6">
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-lg overflow-hidden border-4 border-white/20">
@@ -608,7 +569,6 @@ const PatientDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Mini bouton pour changer la photo (optionnel) */}
             <button
               onClick={triggerFileInput}
               className="absolute bottom-0 right-0 bg-blue-500 rounded-full p-1.5 shadow-lg hover:bg-blue-600 transition"
@@ -679,7 +639,7 @@ const PatientDashboard: React.FC = () => {
                         {doctor.available ? `${doctor.availableSlots.length} créneaux` : '-'}
                       </td>
                       <td className="py-4 px-4 text-white/80 font-semibold">
-                        {doctor.consultationPrice} XOF
+                        {formatPrice(doctor.consultationPrice)} XOF
                       </td>
                       <td className="py-4 px-4">
                         <button
@@ -705,7 +665,6 @@ const PatientDashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
 
-            {/* ── Rendez-vous à venir / en cours ── */}
             <div className="futuristic-card p-8">
               <div className="flex justify-between items-center mb-8">
                 <div>
@@ -791,7 +750,6 @@ const PatientDashboard: React.FC = () => {
               })()}
             </div>
 
-            {/* ── Historique des consultations ── */}
             {(() => {
               const historyList = upcomingAppointments
                 .filter(apt =>
@@ -912,7 +870,6 @@ const PatientDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal de réservation (inchangé) */}
       {showBooking && selectedDoctor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -942,7 +899,7 @@ const PatientDashboard: React.FC = () => {
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
                         <p className="text-lg font-semibold text-gray-900">Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}</p>
                         <p className="text-gray-600 mt-2">{selectedDoctor.specialty}</p>
-                        <p className="text-gray-600 mt-2">Tarif: {selectedDoctor.consultationPrice || 50} XOF</p>
+                        <p className="text-gray-600 mt-2">Tarif: {formatPrice(selectedDoctor.consultationPrice)} XOF</p>
                       </div>
                       <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1062,7 +1019,7 @@ const PatientDashboard: React.FC = () => {
                           <div className="border-t border-gray-200 mt-3 pt-3">
                             <div className="flex justify-between items-center">
                               <span className="font-semibold">Total à payer:</span>
-                              <span className="text-2xl font-bold text-blue-600">{selectedDoctor.consultationPrice || 50} XOF</span>
+                              <span className="text-2xl font-bold text-blue-600">{formatPrice(selectedDoctor.consultationPrice)} XOF</span>
                             </div>
                           </div>
                         </div>
@@ -1117,7 +1074,7 @@ const PatientDashboard: React.FC = () => {
                           className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 font-semibold flex items-center gap-2"
                         >
                           <CreditCard size={18} />
-                          Payer {selectedDoctor.consultationPrice || 50} XOF
+                          Payer {formatPrice(selectedDoctor.consultationPrice)} XOF
                         </button>
                       </div>
                     </div>
