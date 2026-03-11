@@ -1210,21 +1210,20 @@ const AdminDashboard: React.FC = () => {
                 const totalVerse         = earnings.reduce((s, e) => s + (e.stats?.totalPaid || 0), 0);
                 const totalPartMedecin   = totalRevenue * 0.9;
                 const resteAVerser       = Math.max(0, totalPartMedecin - totalVerse);
+                const pendingPayments = totalRevenue - totalVerse;
                 return (
                   <div className="space-y-3">
                     {[
-                      {l:'Revenus totaux',        v:`${totalRevenue.toLocaleString('fr-FR')} XOF`,      c:'text-green-600',  bg:'bg-green-50 border-green-200',   big:true},
-                      {l:'Commission plateforme (10%)', v:`${totalCommission.toLocaleString('fr-FR')} XOF`,   c:'text-purple-600', bg:'bg-purple-50 border-purple-200'       },
-                      {l:'Part médecins (90%)',    v:`${totalPartMedecin.toLocaleString('fr-FR')} XOF`,  c:'text-blue-600',   bg:'bg-blue-50 border-blue-200'           },
-                      {l:'Déjà versé',             v:`${totalVerse.toLocaleString('fr-FR')} XOF`,        c:'text-teal-600',   bg:'bg-teal-50 border-teal-200'           },
-                      {l:'Reste à verser',         v:`${resteAVerser.toLocaleString('fr-FR')} XOF`,      c:'text-red-600',    bg:'bg-red-50 border-red-200'             },
+                      {l:'Revenus totaux',          v:`${totalRevenue.toLocaleString('fr-FR')} XOF`,      c:'text-green-600',  bg:'bg-green-50 border-green-200',   big:true},
+                      {l:'Commission (10%)',         v:`${totalCommission.toLocaleString('fr-FR')} XOF`,   c:'text-purple-600', bg:'bg-purple-50 border-purple-200'       },
+                      {l:'Paiements en attente',     v:`${Math.max(0,pendingPayments).toLocaleString('fr-FR')} XOF`, c:'text-yellow-600', bg:'bg-yellow-50 border-yellow-200'},
+                      {l:'Paiements complétés',      v:`${totalVerse.toLocaleString('fr-FR')} XOF`,        c:'text-blue-600',   bg:'bg-blue-50 border-blue-200'           },
                     ].map(({l,v,c,bg,big})=>(
                       <div key={l} className={`flex justify-between items-center p-4 rounded-xl border ${bg}`}>
                         <span className="text-gray-600 text-sm">{l}</span>
                         <span className={`font-bold ${big?'text-2xl':'text-base'} ${c}`}>{v}</span>
                       </div>
                     ))}
-                    <p className="text-xs text-gray-400 text-right pt-1">{totalConsultations} consultation(s) à 45 000 XOF</p>
                   </div>
                 );
               })()}
