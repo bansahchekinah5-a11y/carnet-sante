@@ -565,7 +565,7 @@ const AdminDashboard: React.FC = () => {
                       { title:'Rendez-vous', value:aptStats.total, icon:Calendar, color:'from-orange-500 to-rose-500',
                         rows:[{l:'En attente',v:aptStats.pending},{l:'Confirmés',v:aptStats.confirmed},{l:'Terminés',v:aptStats.completed},{l:"Aujourd'hui",v:aptStats.today}] },
                       { title:'Revenus', value:`${totalRevenu.toLocaleString('fr-FR')} XOF`, icon:DollarSign, color:'from-emerald-500 to-teal-600',
-                        rows:[{l:'Commission (10%)',v:`${totalCommiss.toLocaleString('fr-FR')} XOF`},{l:'Reste à verser',v:`${resteAVerser.toLocaleString('fr-FR')} XOF`},{l:'Encaissé',v:`${totalVerse.toLocaleString('fr-FR')} XOF`}] },
+                        rows:[{l:'Commission',v:`${totalCommiss.toLocaleString('fr-FR')} XOF`},{l:'En attente',v:`${resteAVerser.toLocaleString('fr-FR')} XOF`},{l:'Encaissé',v:`${totalVerse.toLocaleString('fr-FR')} XOF`}] },
                       { title:'Calendriers', value:calendars.length, icon:Calendar, color:'from-violet-500 to-purple-600',
                         rows:[{l:'Confirmés',v:calendars.filter(c=>c.confirmed).length},{l:'En attente',v:calendars.filter(c=>!c.confirmed).length}] },
                     ].map((c,i) => {
@@ -726,10 +726,9 @@ const AdminDashboard: React.FC = () => {
                         const tv = earnings.reduce((s,e)=>s+(e.stats?.totalPaid||0),0);
                         const rv = Math.max(0, Math.round(tr*0.9)-tv);
                         return(<>
-                          <div className="bg-green-50 border border-green-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Revenus totaux ({tc} consult.)</p><p className="text-2xl font-bold text-green-600">{tr.toLocaleString('fr-FR')} XOF</p></div>
+                          <div className="bg-green-50 border border-green-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Revenus totaux</p><p className="text-2xl font-bold text-green-600">{tr.toLocaleString('fr-FR')} XOF</p></div>
                           <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl"><p className="text-xs text-gray-500">Commission (10%)</p><p className="text-xl font-bold text-purple-600">{cm.toLocaleString('fr-FR')} XOF</p></div>
-                          <div className="flex justify-between items-center p-2.5 bg-teal-50 rounded-lg border border-teal-200"><span className="text-sm text-gray-600">Déjà versé</span><span className="font-semibold text-teal-600 text-sm">{tv.toLocaleString('fr-FR')} XOF</span></div>
-                          <div className="flex justify-between items-center p-2.5 bg-red-50 rounded-lg border border-red-200"><span className="text-sm text-gray-600">Reste à verser</span><span className="font-semibold text-red-600 text-sm">{rv.toLocaleString('fr-FR')} XOF</span></div>
+                          <div className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg"><span className="text-sm text-gray-600">En attente</span><span className="font-semibold text-yellow-600 text-sm">{rv.toLocaleString('fr-FR')} XOF</span></div>
                         </>);
                       })()}
                     </div>
