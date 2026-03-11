@@ -200,6 +200,7 @@ const Register: React.FC = () => {
         submitData.licenseNumber = formData.licenseNumber.trim()
         submitData.biography = formData.biography.trim()
         submitData.languages = formData.languages
+        submitData.consultationPrice = 45000 // Prix fixe plateforme en XOF
       }
       await register(submitData)
       showNotification('Compte créé avec succès!', 'success')
