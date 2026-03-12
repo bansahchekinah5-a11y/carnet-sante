@@ -166,7 +166,7 @@ const PatientDashboard: React.FC = () => {
 
       if (data.success) {
         updateProfilePicture(data.data.profilePicture, data.data.token);
-        showNotification('✅ Photo de profil mise à jour', 'success');
+        showNotification(' Photo de profil mise à jour', 'success');
       }
     } catch (error: any) {
       console.error('❌ Erreur upload:', error);
@@ -336,9 +336,9 @@ const PatientDashboard: React.FC = () => {
 
   const getStatusText = (status: string): string => ({
     pending:   '⏳ En attente',
-    confirmed: '✅ Confirmé',
+    confirmed: ' Confirmé',
     ongoing:   '🔵 En cours',
-    completed: '☑️ Terminé',
+    completed: ' Terminé',
     cancelled: '❌ Annulé',
     no_show:   '👻 Non honoré',
     missed:    '⚠️ Manqué',
@@ -404,7 +404,7 @@ const PatientDashboard: React.FC = () => {
       };
       await appointmentService.createAppointment(appointmentData);
       setBookingConfirmed(true);
-      showNotification('✅ Rendez-vous confirmé ! Le médecin sera notifié.', 'success');
+      showNotification(' Rendez-vous confirmé ! Le médecin sera notifié.', 'success');
       setTimeout(() => {
         setShowBooking(false);
         setSelectedDoctor(null);
