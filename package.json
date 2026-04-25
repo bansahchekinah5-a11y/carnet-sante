@@ -3,9 +3,9 @@
   "type": "module",
   "version": "1.0.0",
   "scripts": {
-    "dev": "npx vite",
+    "dev": "vite",
     "build": "npx vite build",
-    "preview": "npx vite preview",
+    "preview": "vite preview",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
