@@ -1,12 +1,6 @@
-// ============================================
-// 1. src/utils/constants.ts - CORRIGÉ
-// ============================================
-
-// ✅ URL de production (utilisera .env si disponible)
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-                           'https://carnet-sante-backend.onrender.com/api'
+                           'https://carnet-sante-backend-el6y.onrender.com/api'
 
-// Autres constantes
 export const TOKEN_KEY = 'token'
 export const USER_KEY = 'user'
 
@@ -69,5 +63,3 @@ export const SPECIALIZATIONS = [
   'Neurologie',
   'Orthopédie',
 ] as const
-
-
